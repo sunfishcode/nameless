@@ -72,6 +72,21 @@ deterministic-build environments.
 
 ## Example
 
+Using [`kommand`]:
+
+```rust
+/// A simple filter program with input and output
+///
+/// # Arguments
+///
+/// * `input` - Input source
+/// * `output` - Output sink
+#[kommand::main]
+fn main(mut input: InputByteStream, mut output: OutputByteStream) {
+    // ... use `input` and `output`
+}
+```
+
 Using [`structopt`]:
 
 ```rust
@@ -89,22 +104,6 @@ fn main() {
     let mut opt = Opt::from_args();
 
     // ... use `opt.input` and `opt.output`.
-}
-```
-
-Using [`kommand`]:
-
-```rust
-/// A simple filter program with input and output
-#[kommand::main]
-fn main(
-    /// Input source
-    mut input: InputByteStream,
-
-    /// Output sink
-    mut output: OutputByteStream,
-) {
-    // ... use `input` and `output`
 }
 ```
 
