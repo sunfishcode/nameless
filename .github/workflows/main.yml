@@ -1,0 +1,46 @@
+# Pin nightly to nightly-2020-09-21 until async-std supports
+# `open_options_ext_as_flags`.
+#
+# TODO: Test aarch64-apple-darwin once we update to the latest nightly.
+#    - run: cargo check --workspace --all-targets --all-features --release -vv --target=aarch64-apple-darwin
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  rustfmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+    - uses: ./.github/actions/install-rust
+      with:
+        toolchain: stable
+    - run: cargo fmt --all -- --check
+
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        build: [stable]
+        include:
+          - build: stable
+            os: ubuntu-latest
+            rust: stable
+
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+    - uses: ./.github/actions/install-rust
+      with:
+        toolchain: ${{ matrix.rust }}
+    - run: cargo test --workspace
