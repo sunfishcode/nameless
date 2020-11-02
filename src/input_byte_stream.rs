@@ -1,4 +1,4 @@
-use crate::path_url::path_url;
+use crate::{Pseudonym, path_url::path_url};
 use crate::Mime;
 use anyhow::anyhow;
 use data_url::DataUrl;
@@ -29,7 +29,7 @@ use url::Url;
 ///  - Names which don't parse as URLs are interpreted as plain local
 ///    filesystem paths.
 pub struct InputByteStream {
-    pub(crate) name: String,
+    name: String,
     reader: Box<dyn Read>,
     mime: Option<Mime>,
     initial_size: Option<u64>,
@@ -50,6 +50,13 @@ impl InputByteStream {
     /// stream, and the stream could end up being shorter or longer.
     pub fn initial_size(&self) -> Option<u64> {
         self.initial_size
+    }
+
+    /// Return a `Pseudonym` which encapsulates this stream's name (typically
+    /// its filesystem path or its URL). This allows it to be written to an
+    /// `OutputByteStream` while otherwise remaining entirely opaque.
+    pub fn pseudonym(&self) -> Pseudonym {
+        Pseudonym::new(self.name.clone())
     }
 
     fn from_str(s: &str) -> Result<Self, anyhow::Error> {

@@ -1,5 +1,5 @@
 use crate::path_url::path_url;
-use crate::{InputByteStream, Mime};
+use crate::{Pseudonym, Mime};
 use anyhow::anyhow;
 use flate2::{write::GzEncoder, Compression};
 use std::{
@@ -24,24 +24,22 @@ use url::Url;
 ///  - Names which don't parse as URLs are interpreted as plain local
 ///    filesystem paths.
 pub struct OutputByteStream {
-    pub(crate) name: String,
+    name: String,
     writer: Box<dyn Write>,
     mime: Option<Mime>,
 }
 
 impl OutputByteStream {
-    /// Write the name of the given input stream to the output stream. This is
-    /// needed because the name of an `InputByteStream` is not available in
-    /// the public API.
-    pub fn write_input_name(&mut self, in_: &InputByteStream) -> io::Result<()> {
-        self.write_all(in_.name.as_bytes())
+    /// Write the given `Pseudonym` to the output stream.
+    pub fn write_pseudonym(&mut self, pseudonym: &Pseudonym) -> io::Result<()> {
+        self.write_all(pseudonym.name.as_bytes())
     }
 
     /// Write the name of the given output stream to the output stream. This is
     /// needed because the name of an `OutputByteStream` is not available in
     /// the public API.
-    pub fn write_output_name(&mut self, out: &Self) -> io::Result<()> {
-        self.write_all(out.name.as_bytes())
+    pub fn pseudonym(&self) -> Pseudonym {
+        Pseudonym::new(self.name.clone())
     }
 
     /// Return the given stream or stdout.

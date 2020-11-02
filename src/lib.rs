@@ -63,6 +63,8 @@ pub use mime::Mime;
 mod input_byte_stream;
 mod output_byte_stream;
 mod path_url;
+mod pseudonym;
 
 pub use input_byte_stream::InputByteStream;
 pub use output_byte_stream::OutputByteStream;
+pub use pseudonym::Pseudonym;
