@@ -1,25 +1,20 @@
-//! A simple program using `structopt` and `paw` that copies from an
+//! A simple program using `kommand` that copies from an
 //! `InputByteStream` into an `OutputByteStream`.
 
 use nameless::{InputByteStream, OutputByteStream};
 use std::io::copy;
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
-#[structopt(name = "copy", about = "Copy from one stream to another")]
-struct Opt {
+#[kommand::main]
+fn main(
     /// Input source, stdin if not present
     #[structopt(default_value)]
-    input: InputByteStream,
+    mut input: InputByteStream,
 
     /// Output sink, stdout if not present
     #[structopt(default_value)]
-    output: OutputByteStream,
-}
-
-#[paw::main]
-fn main(mut opt: Opt) -> anyhow::Result<()> {
-    copy(&mut opt.input, &mut opt.output)?;
+    mut output: OutputByteStream,
+) -> anyhow::Result<()> {
+    copy(&mut input, &mut output)?;
 
     Ok(())
 }

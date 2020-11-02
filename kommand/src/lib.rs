@@ -58,7 +58,7 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
         quote! {
             #[derive(structopt::StructOpt)]
-            #[structopt(name = "fixme: name", about = "fixme: about")]
+            #[structopt()] // FIXME: name and about
             struct Opt {
                 #(#args,)*
             }
