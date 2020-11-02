@@ -1,0 +1,20 @@
+[package]
+name = "kommand"
+version = "0.0.0"
+description = "Command support macros"
+authors = ["Dan Gohman <dev@sunfishcode.online>"]
+edition = "2018"
+license = "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
+repository = "https://github.com/sunfishcode/nameless"
+readme = "README.md"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "1.0.5", features = ["full", "extra-traits"] }
+proc-macro2 = { version = "1.0.2", features = ["nightly"] }
+quote = "1.0.2"
+
+[badges]
+maintenance = { status = "actively-developed" }

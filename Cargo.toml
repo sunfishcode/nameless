@@ -24,6 +24,7 @@ percent-encoding = "2.1.0"
 structopt = { version = "0.3.20", features = ["paw"] }
 paw = "1.0.0"
 regex = "1.4.2"
+kommand = { path = "kommand" }
 
 [features]
 default = []
