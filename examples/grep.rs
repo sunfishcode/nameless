@@ -2,9 +2,9 @@
 //! Unlike regular grep, this grep supports URLs and gzip. Perg!
 
 use nameless::{InputByteStream, OutputByteStream};
-use structopt::StructOpt;
 use regex::Regex;
-use std::io::{BufReader, BufRead, Write};
+use std::io::{BufRead, BufReader, Write};
+use structopt::StructOpt;
 
 #[derive(StructOpt)]
 #[structopt(name = "grep", about = "A simple grep-like program")]

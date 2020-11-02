@@ -7,8 +7,6 @@ pub struct Pseudonym {
 
 impl Pseudonym {
     pub(crate) fn new(name: String) -> Self {
-        Self {
-            name
-        }
+        Self { name }
     }
 }

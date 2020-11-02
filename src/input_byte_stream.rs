@@ -1,5 +1,5 @@
-use crate::{Pseudonym, path_url::path_url};
 use crate::Mime;
+use crate::{path_url::path_url, Pseudonym};
 use anyhow::anyhow;
 use data_url::DataUrl;
 use flate2::read::GzDecoder;
@@ -71,7 +71,6 @@ impl InputByteStream {
         }
 
         // Otherwise try opening it as a path in the filesystem namespace.
-        // FIXME: `percent_decode`
         Self::from_path(Path::new(s))
     }
 
