@@ -11,9 +11,13 @@ fn main(
     pattern: Regex,
 
     /// Input sources, stdin if none.
-    inputs: Vec<InputByteStream>,
+    mut inputs: Vec<InputByteStream>,
 ) -> anyhow::Result<()> {
     let mut output = OutputByteStream::default();
+
+    if inputs.is_empty() {
+        inputs.push(InputByteStream::stdin());
+    }
 
     for input in inputs {
         let pseudonym = input.pseudonym();

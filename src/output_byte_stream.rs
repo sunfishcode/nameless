@@ -69,7 +69,8 @@ impl OutputByteStream {
         Self::from_path(Path::new(s))
     }
 
-    fn stdout() -> Self {
+    /// Return an input byte stream representing standard output.
+    pub fn stdout() -> Self {
         Self {
             name: "-".to_owned(),
             writer: Box::new(stdout()),

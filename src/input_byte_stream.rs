@@ -74,7 +74,8 @@ impl InputByteStream {
         Self::from_path(Path::new(s))
     }
 
-    fn stdin() -> Self {
+    /// Return an input byte stream representing standard input.
+    pub fn stdin() -> Self {
         Self {
             name: "-".to_owned(),
             reader: Box::new(stdin()),
