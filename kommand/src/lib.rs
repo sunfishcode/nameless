@@ -1,4 +1,5 @@
 use proc_macro::TokenStream;
+use proc_macro2::{TokenTree as TokenTree2, Literal as Literal2};
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 
@@ -17,6 +18,33 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
             compile_error!("only fn main can be tagged with #[kommand::main]");
         };
         return TokenStream::from(tokens);
+    }
+
+    // Convert the function's documentation comment into an `about` attribute
+    // for `structopt`.
+    let mut about = String::new();
+    for attr in attrs {
+        if attr.path.is_ident("doc") {
+            let mut tokens = attr.tokens.clone().into_iter();
+            // Skip the `=`.
+            tokens.next();
+            // Next is the string content.
+            let content = tokens.next().unwrap();
+            // That's it.
+            assert!(tokens.next().is_none());
+
+            let mut s = match content {
+                TokenTree2::Literal(literal) => parse_string_literal(literal),
+                _ => unreachable!()
+            };
+
+            // Trim leading whitespace from the start, because that's
+            // the space between the `///` and the start of the comment.
+            s = s.trim_start().to_string();
+
+            about.push_str(&s);
+            about.push_str("\n");
+        }
     }
 
     let inputs = &input.sig.inputs;
@@ -61,7 +89,7 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
         quote! {
             #[derive(structopt::StructOpt)]
-            #[structopt()] // TODO: name and about. Take about from the doc attribute of `main`?
+            #[structopt(about=#about)]
             struct Opt {
                 #(#args,)*
             }
@@ -78,4 +106,27 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     result.into()
+}
+
+// Convert a `Literal` holding a string literal into the `String`.
+//
+// FIXME: It feels like there should be an easier way to do this.
+fn parse_string_literal(literal: Literal2) -> String {
+    let s = literal.to_string();
+    assert!(
+        s.starts_with('"') && s.ends_with('"'),
+        "string literal must be enclosed in double-quotes"
+    );
+
+    let trimmed = s[1..s.len() - 1].to_owned();
+    assert!(
+        !trimmed.contains('"'),
+        "string literal must not contain embedded quotes for now"
+    );
+    assert!(
+        !trimmed.contains('\\'),
+        "string literal must not contain embedded backslashes for now"
+    );
+
+    trimmed
 }

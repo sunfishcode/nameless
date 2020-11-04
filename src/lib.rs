@@ -49,7 +49,7 @@
 //!
 //! ```rust,ignore
 //! #[derive(StructOpt)]
-//! #[structopt(name = "simple", about = "A simple filter program with input and output")]
+//! #[structopt(about = "A simple filter program with input and output")]
 //! struct Opt {
 //!     /// Input source
 //!     input: Option<InputByteStream>,
@@ -68,6 +68,7 @@
 //! Using [`kommand`]:
 //!
 //! ```rust,ignore
+//! /// A simple filter program with input and output
 //! #[kommand::main]
 //! fn main(
 //!     /// Input source

@@ -59,7 +59,7 @@ Using [`structopt`]:
 
 ```rust
 #[derive(StructOpt)]
-#[structopt(name = "simple", about = "A simple filter program with input and output")]
+#[structopt(about = "A simple filter program with input and output")]
 struct Opt {
     /// Input source
     input: Option<InputByteStream>,
@@ -78,6 +78,7 @@ fn main() {
 Using [`kommand`]:
 
 ```rust
+/// A simple filter program with input and output
 #[kommand::main]
 fn main(
     /// Input source
