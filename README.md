@@ -117,8 +117,9 @@ $ cargo run -- https://example.com out.txt
 ```
 
 With either [`structopt`] or [`kommand`], internally, command-line arguments can
-use any type which implements `FromStr`, such as [`Regex`] or [`Duration`]. See
-[the examples directory] for more examples.
+use any type which implements `FromStr`, including builtin types like `i32` or `bool`
+or library types like [`Regex`] or [`Duration`]. See [the examples directory] for
+more examples.
 
 [`InputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html
 [`OutputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.OutputByteStream.html
