@@ -82,7 +82,29 @@
 //! ```
 //!
 //! In both examples, the underlying command-line argument strings are hidden
-//! from the main program.
+//! from the main program. Command-line usage for both examples looks like this:
+//!
+//! ```
+//! $ cargo run -- --help
+//! simple-filter 0.0.0
+//! A simple filter program with input and output
+//!
+//! USAGE:
+//!     simple-filter <input> <output>
+//!
+//! FLAGS:
+//!     -h, --help       Prints help information
+//!     -V, --version    Prints version information
+//!
+//! ARGS:
+//!     <input>     Input source
+//!     <output>    Output sink
+//! ```
+//!
+//! The arguments can then be a variety of kinds, including URLs and files:
+//! ```
+//! $ cargo run -- https://example.com out.txt
+//! ```
 //!
 //! [`InputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html
 //! [`OutputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.OutputByteStream.html

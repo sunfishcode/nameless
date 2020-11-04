@@ -5,7 +5,7 @@
 
 use anyhow::anyhow;
 use percent_encoding::{percent_encode, NON_ALPHANUMERIC};
-use std::path::{Component, Path};
+use std::{path::{Component, Path}, str};
 
 pub(crate) fn path_to_name(scheme: &str, path: &Path) -> anyhow::Result<String> {
     // FIXME: Windows. Drive letters and potentially-ill-formed UTF-16.
@@ -32,15 +32,14 @@ pub(crate) fn path_to_name(scheme: &str, path: &Path) -> anyhow::Result<String> 
             Ok(format!("{}://{}", scheme, result))
         }
     } else {
-        let result = percent_encode(path.as_os_str().as_bytes(), NON_ALPHANUMERIC).to_string();
+        let result = str::from_utf8(path.as_os_str().as_bytes()).map_err(|_| anyhow!(
+                "not supported yet: non-UTF-8 relative paths",
+            ))?.escape_default().to_string();
         let display = path.display().to_string();
         if result == display {
             Ok(result)
         } else {
-            Err(anyhow!(
-                "not supported yet: non-alphanumeric relative paths: {}",
-                display
-            ))
+            Err(anyhow!("not supported yet: \"interesting\" strings: {}", result))
         }
     }
 }
