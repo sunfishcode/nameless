@@ -84,7 +84,7 @@
 //! In both examples, the underlying command-line argument strings are hidden
 //! from the main program. Command-line usage for both examples looks like this:
 //!
-//! ```
+//! ```ignore
 //! $ cargo run -- --help
 //! simple-filter 0.0.0
 //! A simple filter program with input and output
@@ -102,7 +102,7 @@
 //! ```
 //!
 //! The arguments can then be a variety of kinds, including URLs and files:
-//! ```
+//! ```ignore
 //! $ cargo run -- https://example.com out.txt
 //! ```
 //!
