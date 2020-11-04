@@ -14,7 +14,7 @@ Currently, `http:`, `https:`, `file:`, and `data:` URLs are supported. Plain
 filesystem paths are also accepted, files with names ending with ".gz" are
 decompressed on the fly, and "-" means stdin or stdout.
 
-# Overview
+## Overview
 
 This library provides:
 
@@ -53,7 +53,7 @@ deterministic-build environments.
 [`Read`]: https://doc.rust-lang.org/stable/std/io/trait.Read.html
 [`Write`]: https://doc.rust-lang.org/stable/std/io/trait.Write.html
 
-# Example
+## Example
 
 Using [`structopt`]:
 
@@ -131,7 +131,7 @@ more examples.
 [`Duration`]: https://docs.rs/humantime/latest/humantime/struct.Duration.html
 [the examples directory]: examples
 
-# Data URLs
+## Data URLs
 
 [`data:` URLs] aren't as widely known, but are cool and deserve special
 mention. They carry a payload string in the URL itself which produced as the
@@ -143,7 +143,7 @@ a temporary file.
 
 [`data:` URLs]: https://fetch.spec.whatwg.org/#data-urls
 
-# Literary reference
+## Literary reference
 
 > ‘This must be the wood,’ she said thoughtfully to herself, ‘where things
 > have no names.’
