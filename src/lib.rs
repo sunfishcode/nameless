@@ -106,12 +106,19 @@
 //! $ cargo run -- https://example.com out.txt
 //! ```
 //!
+//! With either [`structopt`] or [`kommand`], internally, command-line arguments can
+//! use any type which implements `FromStr`, such as [`Regex`] or [`Duration`]. See
+//! [the examples directory] for more examples.
+//!
 //! [`InputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html
 //! [`OutputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.OutputByteStream.html
 //! [`InteractiveByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InteractiveByteStream.html
 //! [`BufReaderWriter`]: https://docs.rs/nameless/latest/nameless/struct.BufReaderWriter.html
 //! [`BufReaderLineWriter`]: https://docs.rs/nameless/latest/nameless/struct.BufReaderLineWriter.html
 //! [`ReadWrite`]: https://docs.rs/nameless/latest/nameless/trait.ReadWrite.html
+//! [`Regex`]: https://docs.rs/regex/latest/regex/struct.Regex.html
+//! [`Duration`]: https://docs.rs/humantime/latest/humantime/struct.Duration.html
+//! [the examples directory]: examples
 //!
 //! # Data URLs
 //!
