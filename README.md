@@ -91,8 +91,8 @@ fn main(
 }
 ```
 
-In both examples, the underlying command-line argument strings are hidden, as
-they aren't needed; this library replaces boilerplate for opening files.
+In both examples, the underlying command-line argument strings are hidden
+from the main program.
 
 [`InputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html
 [`OutputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.OutputByteStream.html
