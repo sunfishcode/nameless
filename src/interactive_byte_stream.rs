@@ -203,7 +203,7 @@ impl InteractiveByteStream {
 
     /// Construct a new instance from a plain filesystem path.
     #[cfg(windows)]
-    fn from_path(path: &Path) -> anyhow::Result<Self> {
+    fn from_path(_path: &Path) -> anyhow::Result<Self> {
         Err(anyhow!(
             "interactive filesystem paths not supported on Windows yet"
         ))
