@@ -27,7 +27,10 @@ pub(crate) struct StdinLocker {
 }
 
 pub(crate) struct StdoutLocker {
+    #[cfg(not(windows))]
     raw_fd: RawFd,
+    #[cfg(not(windows))]
+    raw_handle: RawHandle,
     unparker: Unparker,
     handle: Option<JoinHandle<()>>,
 }
@@ -55,7 +58,10 @@ impl StdoutLocker {
     /// Return `None` if a `StdoutLocker` instance already exists.
     pub(crate) fn new() -> Option<Self> {
         if !STDOUT_CLAIMED.compare_and_swap(false, true, SeqCst) {
+            #[cfg(not(windows))]
             let raw_fd = STDOUT.as_raw_fd();
+            #[cfg(windows)]
+            let raw_handle = STDOUT.as_raw_handle();
 
             // Unlike `stdin`, `stdout` is locked with a reentrent mutex, so in
             // order to prevent other uses of it, create a thread and have it
@@ -74,7 +80,10 @@ impl StdoutLocker {
             );
 
             Some(Self {
+                #[cfg(not(windows))]
                 raw_fd,
+                #[cfg(windows)]
+                raw_handle,
                 unparker,
                 handle,
             })

@@ -1,8 +1,9 @@
 use anyhow::anyhow;
-use percent_encoding::{percent_encode, NON_ALPHANUMERIC};
-use std::{
-    path::{Component, Path},
-    str,
+use std::{path::Path, str};
+#[cfg(not(windows))]
+use {
+    percent_encoding::{percent_encode, NON_ALPHANUMERIC},
+    std::path::Component,
 };
 
 #[cfg(not(windows))]
@@ -53,7 +54,7 @@ pub(crate) fn path_to_name(scheme: &str, path: &Path) -> anyhow::Result<String> 
 #[cfg(windows)]
 pub(crate) fn path_to_name(scheme: &str, path: &Path) -> anyhow::Result<String> {
     if path.is_absolute() {
-        Url::from_file_path(path)
+        url::Url::from_file_path(path)
             .map_err(|_| {
                 anyhow!(
                     "not supported yet: \"interesting\" strings: {}",

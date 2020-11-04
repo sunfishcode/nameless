@@ -1,16 +1,17 @@
-use crate::{path_to_name::path_to_name, stdin_stdout::StdinStdout, Pseudonym, ReadWrite};
+use crate::{stdin_stdout::StdinStdout, Pseudonym, ReadWrite};
 use anyhow::anyhow;
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::{
     fmt::{self, Arguments, Debug, Formatter},
-    fs::OpenOptions,
     io::{self, IoSlice, IoSliceMut, Read, Write},
     net::{TcpListener, TcpStream},
     path::Path,
     str::FromStr,
 };
 use url::Url;
+#[cfg(not(windows))]
+use {crate::path_to_name::path_to_name, std::fs::OpenOptions};
 
 /// An `InteractiveByteStream` implements `Read` and `Write` as is meant
 /// to be used with interactive streams.
@@ -205,7 +206,7 @@ impl InteractiveByteStream {
     fn from_path(path: &Path) -> anyhow::Result<Self> {
         Err(anyhow!(
             "interactive filesystem paths not supported on Windows yet"
-        ));
+        ))
     }
 }
 
