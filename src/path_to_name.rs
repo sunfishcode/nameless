@@ -1,8 +1,3 @@
-// absolute path - character device
-// pair of paths? - fifo pair?
-// listen unix-domain socket
-// accept unix-domain socket
-
 use anyhow::anyhow;
 use percent_encoding::{percent_encode, NON_ALPHANUMERIC};
 use std::{
@@ -10,8 +5,9 @@ use std::{
     str,
 };
 
+#[cfg(not(windows))]
 pub(crate) fn path_to_name(scheme: &str, path: &Path) -> anyhow::Result<String> {
-    // FIXME: Windows. Drive letters and potentially-ill-formed UTF-16.
+    #[cfg(unix)]
     use std::os::unix::ffi::OsStrExt;
     if path.is_absolute() {
         let mut result = String::new();
@@ -51,6 +47,22 @@ pub(crate) fn path_to_name(scheme: &str, path: &Path) -> anyhow::Result<String> 
                 result
             ))
         }
+    }
+}
+
+#[cfg(windows)]
+pub(crate) fn path_to_name(scheme: &str, path: &Path) -> anyhow::Result<String> {
+    if path.is_absolute() {
+        Url::from_file_path(path)
+            .map_err(|_| {
+                anyhow!(
+                    "not supported yet: \"interesting\" strings: {}",
+                    path.display()
+                )
+            })?
+            .into_string()
+    } else {
+        Err(anyhow!("not supported yet: non-UTF-8 relative paths",))
     }
 }
 

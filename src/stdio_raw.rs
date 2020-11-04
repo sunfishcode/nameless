@@ -1,10 +1,13 @@
 use crate::stdio_lockers::{StdinLocker, StdoutLocker};
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, FromRawFd};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawHandle, FromRawHandle};
 use std::{
     fmt::Arguments,
     fs::File,
     io::{self, IoSlice, IoSliceMut, Read, Write},
     mem::ManuallyDrop,
-    os::unix::io::{AsRawFd, FromRawFd},
 };
 
 pub(crate) struct StdinRaw {
@@ -20,8 +23,12 @@ pub(crate) struct StdoutRaw {
 impl StdinRaw {
     pub(crate) fn new() -> Option<Self> {
         let locker = StdinLocker::new()?;
-        let fd = locker.as_raw_fd();
-        let owned = unsafe { File::from_raw_fd(fd) };
+
+        #[cfg(not(windows))]
+        let owned = unsafe { File::from_raw_fd(locker.as_raw_fd()) };
+        #[cfg(windows)]
+        let owned = unsafe { File::from_raw_handle(locker.as_raw_handle()) };
+
         let file = ManuallyDrop::new(owned);
         Some(Self {
             file,
@@ -33,8 +40,12 @@ impl StdinRaw {
 impl StdoutRaw {
     pub(crate) fn new() -> Option<Self> {
         let locker = StdoutLocker::new()?;
-        let fd = locker.as_raw_fd();
-        let owned = unsafe { File::from_raw_fd(fd) };
+
+        #[cfg(not(windows))]
+        let owned = unsafe { File::from_raw_fd(locker.as_raw_fd()) };
+        #[cfg(windows)]
+        let owned = unsafe { File::from_raw_handle(locker.as_raw_handle()) };
+
         let file = ManuallyDrop::new(owned);
         Some(Self {
             file,

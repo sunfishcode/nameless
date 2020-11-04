@@ -1,11 +1,12 @@
 use crate::{path_to_name::path_to_name, stdin_stdout::StdinStdout, Pseudonym, ReadWrite};
 use anyhow::anyhow;
+#[cfg(unix)]
+use std::os::unix::net::{UnixListener, UnixStream};
 use std::{
     fmt::{self, Arguments, Debug, Formatter},
     fs::OpenOptions,
     io::{self, IoSlice, IoSliceMut, Read, Write},
     net::{TcpListener, TcpStream},
-    os::unix::net::{UnixListener, UnixStream},
     path::Path,
     str::FromStr,
 };
@@ -20,13 +21,9 @@ use url::Url;
 /// syntaxes include:
 ///  - Names starting with `connect:` or `accept:`, which are
 ///    interpreted as socket addresses to connect to or accept from.
-///    Socket addresses may contain host:port pairs or, on Unix,
-///    filesystem paths to Unix-domain sockets.
+///    Socket addresses may contain host:port pairs or, on platforms which
+///    support it, filesystem paths to Unix-domain sockets.
 ///  - "-" is interpreted as the pair (stdin, stdout).
-///
-///  TODO: named fifos
-///  TODO: unix-domain sockets
-///  TODO: character-special files
 pub struct InteractiveByteStream {
     name: String,
     reader_writer: Box<dyn ReadWrite>,
@@ -99,11 +96,14 @@ impl InteractiveByteStream {
 
             let stream = TcpStream::connect(format!("{}:{}", host_str, port))?;
 
-            Ok(Self {
+            return Ok(Self {
                 name: url.to_string(),
                 reader_writer: Box::new(stream),
-            })
-        } else {
+            });
+        }
+
+        #[cfg(not(windows))]
+        {
             if url.port().is_some() || url.host_str().is_some() {
                 return Err(anyhow!(
                     "Unix-domain connect URL should only contain a path"
@@ -112,11 +112,14 @@ impl InteractiveByteStream {
 
             let stream = UnixStream::connect(url.path())?;
 
-            Ok(Self {
+            return Ok(Self {
                 name: url.to_string(),
                 reader_writer: Box::new(stream),
-            })
+            });
         }
+
+        #[cfg(windows)]
+        return Err(anyhow!("Unsupported connect URL: {}", url));
     }
 
     fn from_accept_url_str(url: Url) -> anyhow::Result<Self> {
@@ -142,11 +145,14 @@ impl InteractiveByteStream {
 
             let (stream, addr) = listener.accept()?;
 
-            Ok(Self {
+            return Ok(Self {
                 name: format!("accept://{}", addr),
                 reader_writer: Box::new(stream),
-            })
-        } else {
+            });
+        }
+
+        #[cfg(not(windows))]
+        {
             if url.port().is_some() || url.host_str().is_some() {
                 return Err(anyhow!(
                     "Unix-domain connect URL should only contain a path"
@@ -159,11 +165,14 @@ impl InteractiveByteStream {
 
             let name = path_to_name("accept", addr.as_pathname().unwrap())?;
 
-            Ok(Self {
+            return Ok(Self {
                 name,
                 reader_writer: Box::new(stream),
-            })
+            });
         }
+
+        #[cfg(windows)]
+        return Err(anyhow!("Unsupported connect URL: {}", url));
     }
 
     /// Construct a new instance from a plain filesystem path.
