@@ -116,7 +116,7 @@ The arguments can then be a variety of kinds, including URLs and files:
 $ cargo run -- https://example.com out.txt
 ```
 
-With either [`structopt`] or [`kommand`], internally, command-line arguments can
+With either [`structopt`] or [`kommand`], command-line arguments can
 use any type which implements `FromStr`, including builtin types like `i32` or `bool`
 or library types like [`Regex`] or [`Duration`]. See [the examples directory] for
 more examples.
