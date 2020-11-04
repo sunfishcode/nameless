@@ -1,5 +1,5 @@
 use proc_macro::TokenStream;
-use proc_macro2::{TokenTree as TokenTree2, Literal as Literal2};
+use proc_macro2::{Literal as Literal2, TokenTree as TokenTree2};
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 
@@ -35,7 +35,7 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
             let mut s = match content {
                 TokenTree2::Literal(literal) => parse_string_literal(literal),
-                _ => unreachable!()
+                _ => unreachable!(),
             };
 
             // Trim leading whitespace from the start, because that's
