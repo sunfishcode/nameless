@@ -54,14 +54,14 @@ pub(crate) fn path_to_name(scheme: &str, path: &Path) -> anyhow::Result<String> 
 #[cfg(windows)]
 pub(crate) fn path_to_name(scheme: &str, path: &Path) -> anyhow::Result<String> {
     if path.is_absolute() {
-        url::Url::from_file_path(path)
+        Ok(url::Url::from_file_path(path)
             .map_err(|_| {
                 anyhow!(
                     "not supported yet: \"interesting\" strings: {}",
                     path.display()
                 )
             })?
-            .into_string()
+            .into_string())
     } else {
         Err(anyhow!("not supported yet: non-UTF-8 relative paths",))
     }
