@@ -38,3 +38,9 @@ nightly = []
 
 [badges]
 maintenance = { status = "actively-developed" }
+
+[workspace]
+members = [
+  "kommand",
+  "reaktor",
+]
