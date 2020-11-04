@@ -22,6 +22,7 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     // Convert the function's documentation comment into an `about` attribute
     // for `structopt`.
+    let mut abouts = Vec::new();
     let mut about = String::new();
     for attr in attrs {
         if attr.path.is_ident("doc") {
@@ -45,6 +46,9 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
             about.push_str(&s);
             about.push_str("\n");
         }
+    }
+    if !about.is_empty() {
+        abouts.push(about);
     }
 
     let inputs = &input.sig.inputs;
@@ -89,7 +93,7 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
         quote! {
             #[derive(structopt::StructOpt)]
-            #[structopt(about=#about)]
+            #[structopt(#(about=#abouts)*)]
             struct Opt {
                 #(#args,)*
             }
