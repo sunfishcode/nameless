@@ -9,7 +9,7 @@
 //! This library provides:
 //!
 //!  - New stream types, [`InputByteStream`], [`OutputByteStream`], and
-//!    [`InteractiveByteStream`], which implement `Read`, `Write`, and both,
+//!    [`InteractiveByteStream`], which implement [`Read`], [`Write`], and both,
 //!    respectively, which you can use in type-aware command-line parsing
 //!    packages such as [`structopt`], [`clap-v3`], or this library's own
 //!    [`kommand`].
