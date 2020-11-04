@@ -52,10 +52,10 @@
 //! #[structopt(about = "A simple filter program with input and output")]
 //! struct Opt {
 //!     /// Input source
-//!     input: Option<InputByteStream>,
+//!     input: InputByteStream,
 //!
 //!     /// Output sink
-//!     output: Option<OutputByteStream>,
+//!     output: OutputByteStream,
 //! }
 //!
 //! fn main() {
