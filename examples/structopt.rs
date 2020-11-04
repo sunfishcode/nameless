@@ -24,8 +24,7 @@ struct Opt {
     input: InputByteStream,
 
     /// Output sink, stdout if not present
-    #[structopt(default_value)]
-    output: OutputByteStream,
+    output: Option<OutputByteStream>,
 }
 
 fn main() {

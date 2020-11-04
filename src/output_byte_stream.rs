@@ -1,17 +1,16 @@
-use crate::path_url::path_url;
-use crate::{Mime, Pseudonym};
+use crate::{path_to_name::path_to_name, stdio_raw::StdoutRaw, Mime, Pseudonym};
 use anyhow::anyhow;
 use flate2::{write::GzEncoder, Compression};
 use std::{
-    fmt::{self, Arguments, Debug, Display, Formatter},
+    fmt::{self, Arguments, Debug, Formatter},
     fs::File,
-    io::{self, stdout, IoSlice, Write},
+    io::{self, IoSlice, Write},
     path::Path,
     str::FromStr,
 };
 use url::Url;
 
-/// An `OutputByteStream` has `deref`s to `Write` so it supports `write`,
+/// An `OutputByteStream` implements `Write` so it supports `write`,
 /// `write_all`, etc. and can be used anywhere a `Write`-implementing
 /// object is needed.
 ///
@@ -21,8 +20,13 @@ use url::Url;
 /// syntaxes include:
 ///  - Names starting with `file:` are interpreted as local filesystem
 ///    URLs providing paths to files to open.
+///  - "-" is interpreted as standard output.
 ///  - Names which don't parse as URLs are interpreted as plain local
 ///    filesystem paths.
+///
+/// Programs using `OutputByteStream` as an argument should avoid using
+/// `std::io::stdout`, `std::println`, or anything else which uses standard
+/// output implicitly.
 pub struct OutputByteStream {
     name: String,
     writer: Box<dyn Write>,
@@ -42,11 +46,6 @@ impl OutputByteStream {
         Pseudonym::new(self.name.clone())
     }
 
-    /// Return the given stream or stdout.
-    pub fn default_to_stdout(maybe_me: Option<Self>) -> Self {
-        maybe_me.unwrap_or_else(Self::stdout)
-    }
-
     /// If the output stream metadata implies a particular media type, also
     /// known as MIME type, return it. Some output streams know their type,
     /// though many do not.
@@ -62,7 +61,7 @@ impl OutputByteStream {
 
         // Special-case "-" to mean stdout.
         if s == "-" {
-            return Ok(Self::stdout());
+            return Self::stdout();
         }
 
         // Otherwise try opening it as a path in the filesystem namespace.
@@ -70,12 +69,15 @@ impl OutputByteStream {
     }
 
     /// Return an input byte stream representing standard output.
-    pub fn stdout() -> Self {
-        Self {
+    pub fn stdout() -> anyhow::Result<Self> {
+        Ok(Self {
             name: "-".to_owned(),
-            writer: Box::new(stdout()),
+            writer: Box::new(
+                StdoutRaw::new()
+                    .ok_or_else(|| anyhow!("attempted to open stdout multiple times"))?,
+            ),
             mime: None,
-        }
+        })
     }
 
     /// Construct a new instance from a URL.
@@ -95,7 +97,7 @@ impl OutputByteStream {
                 {
                     return Err(anyhow!("file URL should only contain a path"));
                 }
-                // FIXME: https://docs.rs/url/latest/url/struct.Url.html#method.to_file_path
+                // TODO: https://docs.rs/url/latest/url/struct.Url.html#method.to_file_path
                 // is ambiguous about how it can fail. What is `Path::new_opt`?
                 Self::from_path(
                     &url.to_file_path()
@@ -109,8 +111,8 @@ impl OutputByteStream {
 
     /// Construct a new instance from a plain filesystem path.
     fn from_path(path: &Path) -> anyhow::Result<Self> {
+        let name = path_to_name("file", path)?;
         let file = File::create(path).map_err(|err| anyhow!("{}: {}", path.display(), err))?;
-        let name = path_url(path);
         if path.extension() == Some(Path::new("gz").as_os_str()) {
             // TODO: We shouldn't really need to allocate a `PathBuf` here.
             let path = path.with_extension("");
@@ -146,55 +148,40 @@ impl FromStr for OutputByteStream {
     }
 }
 
-/// Implement `Default` so that `structopt` can give `OutputByteStream` default
-/// values automatically. For now, hide this from the documentation as it's
-/// not clear if we want to commit to this approach. A potential concern:
-///  - Opening resources as a default assumes ambient authorities.
-#[doc(hidden)]
-impl Default for OutputByteStream {
-    fn default() -> Self {
-        Self::stdout()
-    }
-}
-
-/// Implement `Display` so that `structopt` can give `OutputByteStream` default
-/// values automatically. For now, hide this from the documentation as it's
-/// not clear if we want to commit to this approach. A potential concern:
-///  - Opening resources as a default assumes ambient authorities.
-#[doc(hidden)]
-impl Display for OutputByteStream {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.name, f)
-    }
-}
-
 impl Write for OutputByteStream {
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.writer.write(buf)
     }
 
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.writer.flush()
     }
 
+    #[inline]
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         self.writer.write_vectored(bufs)
     }
 
     #[cfg(feature = "nightly")]
+    #[inline]
     fn is_write_vectored(&self) -> bool {
         self.writer.is_write_vectored()
     }
 
+    #[inline]
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
         self.writer.write_all(buf)
     }
 
     #[cfg(feature = "nightly")]
+    #[inline]
     fn write_all_vectored(&mut self, bufs: &mut [IoSlice<'_>]) -> io::Result<()> {
         self.writer.write_all_vectored(bufs)
     }
 
+    #[inline]
     fn write_fmt(&mut self, fmt: Arguments<'_>) -> io::Result<()> {
         self.writer.write_fmt(fmt)
     }

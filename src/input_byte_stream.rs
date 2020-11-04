@@ -1,18 +1,17 @@
-use crate::Mime;
-use crate::{path_url::path_url, Pseudonym};
+use crate::{path_to_name::path_to_name, stdio_raw::StdinRaw, Mime, Pseudonym};
 use anyhow::anyhow;
 use data_url::DataUrl;
 use flate2::read::GzDecoder;
 use std::{
-    fmt::{self, Debug, Display, Formatter},
+    fmt::{self, Debug, Formatter},
     fs::File,
-    io::{self, stdin, Cursor, IoSliceMut, Read},
+    io::{self, Cursor, IoSliceMut, Read},
     path::Path,
     str::FromStr,
 };
 use url::Url;
 
-/// An `InputByteStream` has `deref`s to `Read` so it supports `read`,
+/// An `InputByteStream` implements `Read` so it supports `read`,
 /// `read_to_end`, `read_to_str`, etc. and can be used anywhere a
 /// `Read`-implementing object is needed.
 ///
@@ -26,6 +25,7 @@ use url::Url;
 ///    the data in their payload.
 ///  - Names starting with `file:` are interpreted as local filesystem
 ///    URLs providing paths to files to open.
+///  - "-" is interpreted as standard input.
 ///  - Names which don't parse as URLs are interpreted as plain local
 ///    filesystem paths.
 pub struct InputByteStream {
@@ -67,7 +67,7 @@ impl InputByteStream {
 
         // Special-case "-" to mean stdin.
         if s == "-" {
-            return Ok(Self::stdin());
+            return Self::stdin();
         }
 
         // Otherwise try opening it as a path in the filesystem namespace.
@@ -75,13 +75,15 @@ impl InputByteStream {
     }
 
     /// Return an input byte stream representing standard input.
-    pub fn stdin() -> Self {
-        Self {
+    pub fn stdin() -> anyhow::Result<Self> {
+        Ok(Self {
             name: "-".to_owned(),
-            reader: Box::new(stdin()),
+            reader: Box::new(
+                StdinRaw::new().ok_or_else(|| anyhow!("attempted to open stdin multiple times"))?,
+            ),
             mime: None,
             initial_size: None,
-        }
+        })
     }
 
     /// Construct a new instance from a URL.
@@ -99,7 +101,7 @@ impl InputByteStream {
                 {
                     return Err(anyhow!("file URL should only contain a path"));
                 }
-                // FIXME: https://docs.rs/url/latest/url/struct.Url.html#method.to_file_path
+                // TODO: https://docs.rs/url/latest/url/struct.Url.html#method.to_file_path
                 // is ambiguous about how it can fail. What is `Path::new_opt`?
                 Self::from_path(
                     &url.to_file_path()
@@ -142,10 +144,10 @@ impl InputByteStream {
 
     /// Construct a new instance from a `data:` URL.
     fn from_data_url_str(data_url_str: &str) -> anyhow::Result<Self> {
-        // FIXME: `DataUrl` should really implement `std::error::Error`.
+        // TODO: `DataUrl` should really implement `std::error::Error`.
         let data_url = DataUrl::process(data_url_str)
             .map_err(|e| anyhow!("invalid data URL syntax: {:?}", e))?;
-        // FIXME: `DataUrl` should really really implement `std::error::Error`.
+        // TODO: `DataUrl` should really really implement `std::error::Error`.
         let (body, fragment) = data_url
             .decode_to_vec()
             .map_err(|_| anyhow!("invalid base64 encoding"))?;
@@ -168,9 +170,9 @@ impl InputByteStream {
 
     /// Construct a new instance from a plain filesystem path.
     fn from_path(path: &Path) -> anyhow::Result<Self> {
+        let name = path_to_name("file", path)?;
         // TODO: Should we have our own error type?
         let file = File::open(path).map_err(|err| anyhow!("{}: {}", path.display(), err))?;
-        let name = path_url(path);
         if path.extension() == Some(Path::new("gz").as_os_str()) {
             // TODO: We shouldn't really need to allocate a `PathBuf` here.
             let path = path.with_extension("");
@@ -206,28 +208,6 @@ impl FromStr for InputByteStream {
 
     fn from_str(s: &str) -> anyhow::Result<Self> {
         Self::from_str(s)
-    }
-}
-
-/// Implement `Default` so that `structopt` can give `InputByteStream` default
-/// values automatically. For now, hide this from the documentation as it's
-/// not clear if we want to commit to this approach. A potential concern:
-///  - Opening resources as a default assumes ambient authorities.
-#[doc(hidden)]
-impl Default for InputByteStream {
-    fn default() -> Self {
-        Self::stdin()
-    }
-}
-
-/// Implement `Display` so that `structopt` can give `InputByteStream` default
-/// values automatically. For now, hide this from the documentation as it's
-/// not clear if we want to commit to this approach. A potential concern:
-///  - Opening resources as a default assumes ambient authorities.
-#[doc(hidden)]
-impl Display for InputByteStream {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.name, f)
     }
 }
 

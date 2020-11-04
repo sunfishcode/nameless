@@ -6,10 +6,14 @@
 use nameless::{InputByteStream, OutputByteStream};
 use std::io::copy;
 
+/// A minimal example showing how `kommand`, `InputByteStream`,
+/// and `OutputByteStream` all work together.
+#[rustfmt::skip] // TODO: rustfmt mishandles doc comments on arguments
 #[kommand::main]
 fn main(
     /// Input source
     mut input: InputByteStream,
+
     /// Output sink
     mut output: OutputByteStream,
 ) -> anyhow::Result<()> {

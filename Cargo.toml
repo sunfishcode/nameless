@@ -11,20 +11,25 @@ repository = "https://github.com/sunfishcode/nameless"
 readme = "README.md"
 
 [dependencies]
-anyhow = "1.0.33"
+anyhow = "1.0.34"
 data-url = "0.1.0"
-flate2 = "1.0.18"
+flate2 = "1.0.19"
+memchr = "2.3.4"
 mime = "0.3.16"
 mime_guess = "2.0.3"
+once_cell = "1.3.1"
+parking = "2.0.0"
+percent-encoding = "2.1.0"
+readwrite = { version = "0.1.2", optional = true }
 ureq = { version = "1.5.1", default-features = false, features = ["tls", "charset"] }
 url = "2.1.1"
-percent-encoding = "2.1.0"
 
 [dev-dependencies]
-structopt = { version = "0.3.20", features = ["paw"] }
+humantime = "2.0.1"
+kommand = { path = "kommand" }
 paw = "1.0.0"
 regex = "1.4.2"
-kommand = { path = "kommand" }
+structopt = { version = "0.3.20", features = ["paw"] }
 
 [features]
 default = []

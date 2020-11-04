@@ -39,6 +39,8 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
             arg_names.push(arg.pat.clone());
             arg_types.push(arg.ty.clone());
 
+            // Create a copy of the ident with the leading `mut` removed,
+            // if applicable.
             let mut no_mut_ident = match &*arg.pat {
                 syn::Pat::Ident(ident) => ident.clone(),
                 _ => {
@@ -50,6 +52,7 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
             };
             no_mut_ident.mutability = None;
 
+            // Create a copy of the argument with the no-`mut` ident.
             let mut no_mut_arg = arg.clone();
             no_mut_arg.pat = Box::new(syn::Pat::Ident(no_mut_ident));
 
@@ -58,14 +61,14 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
         quote! {
             #[derive(structopt::StructOpt)]
-            #[structopt()] // FIXME: name and about
+            #[structopt()] // TODO: name and about. Take about from the doc attribute of `main`?
             struct Opt {
                 #(#args,)*
             }
 
             #(#attrs)*
             #[paw::main]
-            #asyncness fn main(mut opt: Opt) #ret {
+            #asyncness fn main(opt: Opt) #ret {
                 #(let #arg_names = opt.#no_mut_arg_names;)*
 
                 #body
