@@ -20,8 +20,8 @@
 //!    options struct.
 //!
 //!  - New buffered I/O helpers, [`BufReaderWriter`] and [`BufReaderLineWriter`],
-//!    which work like `BufReader` combined with `BufWriter` and `LineWriter`
-//!    respectively, and a `ReadWrite` trait which combines `Read` and `Write,
+//!    which work like [`BufReader`] combined with [`BufWriter`] and [`LineWriter`]
+//!    respectively, and a [`ReadWrite`] trait which combines [`Read`] and [`Write`],
 //!    for working with `InteractiveByteStream`s.
 //!
 //! When using these features, boilerplate for converting command-line argument
@@ -37,6 +37,11 @@
 //! [`clap-v3`]: https://crates.io/crates/clap-v3
 //! [`paw`]: https://crates.io/crates/paw
 //! [`kommand`]: https://crates.io/crates/kommand
+//! [`BufReader`]: https://doc.rust-lang.org/stable/std/io/struct.BufReader.html
+//! [`BufWriter`]: https://doc.rust-lang.org/stable/std/io/struct.BufWriter.html
+//! [`LineWriter`]: https://doc.rust-lang.org/stable/std/io/struct.LineWriter.html
+//! [`Read`]: https://doc.rust-lang.org/stable/std/io/trait.Read.html
+//! [`Write`]: https://doc.rust-lang.org/stable/std/io/trait.Write.html
 //!
 //! # Example
 //!
@@ -83,6 +88,7 @@
 //! [`InteractiveByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InteractiveByteStream.html
 //! [`BufReaderWriter`]: https://docs.rs/nameless/latest/nameless/struct.BufReaderWriter.html
 //! [`BufReaderLineWriter`]: https://docs.rs/nameless/latest/nameless/struct.BufReaderLineWriter.html
+//! [`ReadWrite`]: https://docs.rs/nameless/latest/nameless/trait.ReadWrite.html
 //!
 //! # Data URLs
 //!
