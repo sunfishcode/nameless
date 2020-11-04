@@ -14,7 +14,7 @@ Currently, `http:`, `https:`, `file:`, and `data:` URLs are supported. Plain
 filesystem paths are also accepted, files with names ending with ".gz" are
 decompressed on the fly, and "-" means stdin or stdout.
 
-# How it works
+# Overview
 
 This library provides:
 
