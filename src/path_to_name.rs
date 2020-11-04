@@ -39,6 +39,9 @@ pub(crate) fn path_to_name(scheme: &str, path: &Path) -> anyhow::Result<String> 
             .map_err(|_| anyhow!("not supported yet: non-UTF-8 relative paths",))?
             .escape_default()
             .to_string();
+        if result.contains(":") {
+            return Err(anyhow!("not supported yet: strings containins `:`"));
+        }
         let display = path.display().to_string();
         if result == display {
             Ok(result)
