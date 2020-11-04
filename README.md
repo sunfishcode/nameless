@@ -16,44 +16,83 @@ decompressed on the fly, and "-" means stdin or stdout.
 
 # How it works
 
-This library defines stream types [`InputByteStream`], [`OutputByteStream`],
-and [`InteractiveByteStream`], which you can use in type-aware command-line
-parsing packages to declare input and output streams that your program needs.
-User input strings are automatically converted into streams as needed:
+This library provides:
+
+ - New stream types, [`InputByteStream`], [`OutputByteStream`], and
+   [`InteractiveByteStream`], which implement `Read`, `Write`, and both,
+   respectively, which you can use in type-aware command-line parsing
+   packages such as [`structopt`], [`clap-v3`], or this library's own
+   [`kommand`].
+
+ - A new command-line parsing package, [`kommand`], which is similar to
+   (and built on) [`structopt`] with [`paw`] support enabled, but which goes
+   a step further and uses function argument syntax instead of having an
+   options struct.
+
+ - New buffered I/O helpers, [`BufReaderWriter`] and [`BufReaderLineWriter`],
+   which work like `BufReader` combined with `BufWriter` and `LineWriter`
+   respectively, and a `ReadWrite` trait which combines `Read` and `Write,
+   for working with `InteractiveByteStream`s.
+
+When using these features, boilerplate for converting command-line argument
+strings into open files is abstracted away, allowing this library to
+transparently provide more features such as recognizing URLs and gzip'd files,
+and "-" for stdin or stdout.
+
+It also helps programs avoid accidentally having behavior that depends on
+the names of files it accesses, which is a common source of trouble in
+deterministic-build environments.
+
+[`structopt`]: https://crates.io/crates/structopt
+[`clap-v3`]: https://crates.io/crates/clap-v3
+[`paw`]: https://crates.io/crates/paw
+[`kommand`]: https://crates.io/crates/kommand
+
+# Example
+
+Using [`structopt`]:
 
 ```rust
 #[derive(StructOpt)]
 #[structopt(name = "simple", about = "A simple filter program with input and output")]
 struct Opt {
-    /// Input file
+    /// Input source
     input: Option<InputByteStream>,
 
-    /// Output file
+    /// Output sink
     output: Option<OutputByteStream>,
 }
 
 fn main() {
-    let opt = Opt::from_args();
+    let mut opt = Opt::from_args();
 
     // ... use `opt.input` and `opt.output`.
 }
 ```
 
-The actual command-line argument strings are hidden, as they aren't needed;
-this library replaces boilerplate for opening files. And since it's common
-for this boilerplate to assume that inputs are plain files, this library will
-often bring more flexibility. Users can specify inputs in URLs as well as
-files, files may be optionally gzipped, and "-" means to use standard input
-or output.
+Using [`kommand`]:
 
-And, by encapsulating the name-to-stream conversion and hiding the actual
-names from users of the API, we prevent applications from accidentally
-embedding paths in their output, which is a common source of breakage in
-deterministic build environments.
+```rust
+#[kommand::main]
+fn main(
+    /// Input source
+    mut input: InputByteStream,
+
+    /// Output sink
+    mut output: OutputByteStream,
+) {
+    // ... use `input` and `output`
+}
+```
+
+In both examples, the underlying command-line argument strings are hidden, as
+they aren't needed; this library replaces boilerplate for opening files.
 
 [`InputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html
 [`OutputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.OutputByteStream.html
 [`InteractiveByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InteractiveByteStream.html
+[`BufReaderWriter`]: https://docs.rs/nameless/latest/nameless/struct.BufReaderWriter.html
+[`BufReaderLineWriter`]: https://docs.rs/nameless/latest/nameless/struct.BufReaderLineWriter.html
 
 # Data URLs
 
