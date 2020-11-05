@@ -20,6 +20,9 @@ pub use bufwriter::BufWriter;
 pub use linewriter::LineWriter;
 use linewritershim::LineWriterShim;
 
+/// The value from `library/std/src/sys_common/io.rs`.
+pub(super) const DEFAULT_BUF_SIZE: usize = 8 * 1024;
+
 /// An error returned by [`BufWriter::into_inner`] which combines an error that
 /// happened while writing out the buffer, and the buffered writer object
 /// which may be used to recover from the condition.
