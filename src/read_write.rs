@@ -7,7 +7,7 @@ pub trait ReadWrite: Read + Write {}
 // Implement `ReadWrite` for our stream types.
 impl ReadWrite for crate::stdin_stdout::StdinStdout {}
 impl ReadWrite for crate::interactive_byte_stream::InteractiveByteStream {}
-impl<RW: ReadWrite> ReadWrite for crate::buf_reader_writer::BufReaderWriter<RW> {}
+impl<RW: ReadWrite> ReadWrite for crate::BufReaderWriter<RW> {}
 
 // Implement `ReadWrite` for `std`'s stream types. Note that we include
 // `File` even though regular files aren't interactive, because device
