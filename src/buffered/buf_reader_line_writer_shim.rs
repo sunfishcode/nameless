@@ -2,62 +2,62 @@
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
 use std::io::{self, IoSlice, Write};
-use super::BufWriter;
+use super::BufReaderWriter;
 use crate::ReadWrite;
 
 /// Private helper struct for implementing the line-buffered writing logic.
-/// This shim temporarily wraps a BufWriter, and uses its internals to
+/// This shim temporarily wraps a BufReaderWriter, and uses its internals to
 /// implement a line-buffered writer (specifically by using the internal
 /// methods like write_to_buf and flush_buf). In this way, a more
 /// efficient abstraction can be created than one that only had access to
 /// `write` and `flush`, without needlessly duplicating a lot of the
-/// implementation details of BufWriter. This also allows existing
-/// `BufWriters` to be temporarily given line-buffering logic; this is what
+/// implementation details of BufReaderWriter. This also allows existing
+/// `BufReaderWriter`s to be temporarily given line-buffering logic; this is what
 /// enables Stdout to be alternately in line-buffered or block-buffered mode.
 #[derive(Debug)]
-pub struct LineWriterShim<'a, RW: ReadWrite> {
-    buffer: &'a mut BufWriter<RW>,
+pub(super) struct BufReaderLineWriterShim<'a, RW: ReadWrite> {
+    buffer: &'a mut BufReaderWriter<RW>,
 }
 
-impl<'a, RW: ReadWrite> LineWriterShim<'a, RW> {
+impl<'a, RW: ReadWrite> BufReaderLineWriterShim<'a, RW> {
     #[inline]
-    pub fn new(buffer: &'a mut BufWriter<RW>) -> Self {
+    pub fn new(buffer: &'a mut BufReaderWriter<RW>) -> Self {
         Self { buffer }
     }
 
     /// Get a mutable reference to the inner writer (that is, the writer
-    /// wrapped by the BufWriter). Be careful with this writer, as writes to
+    /// wrapped by the BufReaderWriter). Be careful with this writer, as writes to
     /// it will bypass the buffer.
     #[inline]
     fn inner_mut(&mut self) -> &mut RW {
         self.buffer.get_mut()
     }
 
-    /// Get the content currently buffered in self.buffer
+    /// Get the content currently buffered in self.buffer's writer buffer
     #[inline]
-    fn buffered(&self) -> &[u8] {
-        self.buffer.buffer()
+    fn writer_buffered(&self) -> &[u8] {
+        self.buffer.writer_buffer()
     }
 
     /// Flush the buffer iff the last byte is a newline (indicating that an
     /// earlier write only succeeded partially, and we want to retry flushing
     /// the buffered line before continuing with a subsequent write)
     fn flush_if_completed_line(&mut self) -> io::Result<()> {
-        match self.buffered().last().copied() {
+        match self.writer_buffered().last().copied() {
             Some(b'\n') => self.buffer.flush_buf(),
             _ => Ok(()),
         }
     }
 }
 
-impl<'a, RW: ReadWrite> Write for LineWriterShim<'a, RW> {
-    /// Write some data into this BufReader with line buffering. This means
+impl<'a, RW: ReadWrite> Write for BufReaderLineWriterShim<'a, RW> {
+    /// Write some data into this BufReaderLineWriterShim with line buffering. This means
     /// that, if any newlines are present in the data, the data up to the last
     /// newline is sent directly to the underlying writer, and data after it
     /// is buffered. Returns the number of bytes written.
     ///
     /// This function operates on a "best effort basis"; in keeping with the
-    /// convention of `Write::write`, it makes at most one attempt to write
+    /// convention of `std::io::Write::write`, it makes at most one attempt to write
     /// new data to the underlying writer. If that write only reports a partial
     /// success, the remaining data will be buffered.
     ///
@@ -91,7 +91,7 @@ impl<'a, RW: ReadWrite> Write for LineWriterShim<'a, RW> {
 
         // Write `lines` directly to the inner writer. In keeping with the
         // `write` convention, make at most one attempt to add new (unbuffered)
-        // data. Because this write doesn't touch the BufWriter state directly,
+        // data. Because this write doesn't touch the BufReaderWriter state directly,
         // and the buffer is known to be empty, we don't need to worry about
         // self.buffer.panicked here.
         let flushed = self.inner_mut().write(lines)?;
@@ -107,7 +107,7 @@ impl<'a, RW: ReadWrite> Write for LineWriterShim<'a, RW> {
         // the rest as possible). If there were any unwritten newlines, we
         // only buffer out to the last unwritten newline that fits in the
         // buffer; this helps prevent flushing partial lines on subsequent
-        // calls to LineWriterShim::write.
+        // calls to BufReaderLineWriterShim::write.
 
         // Handle the cases in order of most-common to least-common, under
         // the presumption that most writes succeed in totality, and that most
@@ -118,11 +118,11 @@ impl<'a, RW: ReadWrite> Write for LineWriterShim<'a, RW> {
         // - If not, scan for the last newline that *does* fit in the buffer
         let tail = if flushed >= newline_idx {
             &buf[flushed..]
-        } else if newline_idx - flushed <= self.buffer.capacity() {
+        } else if newline_idx - flushed <= self.buffer.writer_capacity() {
             &buf[flushed..newline_idx]
         } else {
             let scan_area = &buf[flushed..];
-            let scan_area = &scan_area[..self.buffer.capacity()];
+            let scan_area = &scan_area[..self.buffer.writer_capacity()];
             match memchr::memrchr(b'\n', scan_area) {
                 Some(newline_idx) => &scan_area[..newline_idx + 1],
                 None => scan_area,
@@ -138,14 +138,14 @@ impl<'a, RW: ReadWrite> Write for LineWriterShim<'a, RW> {
         self.buffer.flush()
     }
 
-    /// Write some vectored data into this BufReader with line buffering. This
+    /// Write some vectored data into this BufReaderLineWriterShim with line buffering. This
     /// means that, if any newlines are present in the data, the data up to
     /// and including the buffer containing the last newline is sent directly
     /// to the inner writer, and the data after it is buffered. Returns the
     /// number of bytes written.
     ///
     /// This function operates on a "best effort basis"; in keeping with the
-    /// convention of `Write::write`, it makes at most one attempt to write
+    /// convention of `std::io::Write::write`, it makes at most one attempt to write
     /// new data to the underlying writer.
     ///
     /// Because this function attempts to send completed lines to the underlying
@@ -204,7 +204,7 @@ impl<'a, RW: ReadWrite> Write for LineWriterShim<'a, RW> {
 
         // Write `lines` directly to the inner writer. In keeping with the
         // `write` convention, make at most one attempt to add new (unbuffered)
-        // data. Because this write doesn't touch the BufWriter state directly,
+        // data. Because this write doesn't touch the BufReaderWriter state directly,
         // and the buffer is known to be empty, we don't need to worry about
         // self.panicked here.
         let flushed = self.inner_mut().write_vectored(lines)?;
@@ -241,7 +241,7 @@ impl<'a, RW: ReadWrite> Write for LineWriterShim<'a, RW> {
         self.buffer.is_write_vectored()
     }
 
-    /// Write some data into this BufReader with line buffering. This means
+    /// Write some data into this BufReaderLineWriterShim with line buffering. This means
     /// that, if any newlines are present in the data, the data up to the last
     /// newline is sent directly to the underlying writer, and data after it
     /// is buffered.
@@ -261,7 +261,7 @@ impl<'a, RW: ReadWrite> Write for LineWriterShim<'a, RW> {
             Some(newline_idx) => {
                 let (lines, tail) = buf.split_at(newline_idx + 1);
 
-                if self.buffered().is_empty() {
+                if self.writer_buffered().is_empty() {
                     self.inner_mut().write_all(lines)?;
                 } else {
                     // If there is any buffered data, we add the incoming lines

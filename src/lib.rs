@@ -141,12 +141,13 @@
 //! — <cite>"Through the Looking Glass", by Lewis Carroll</cite>
 
 #![deny(missing_docs)]
+#![cfg_attr(feature = "nightly", feature(read_initializer))]
+#![cfg_attr(feature = "nightly", feature(can_vector))]
+#![cfg_attr(feature = "nightly", feature(write_all_vectored))]
 
 pub use mime::Mime;
 
-mod buf_reader_line_writer;
-mod buf_reader_line_writer_shim;
-mod buf_reader_writer;
+mod buffered;
 mod input_byte_stream;
 mod interactive_byte_stream;
 mod output_byte_stream;
@@ -157,8 +158,7 @@ mod stdin_stdout;
 mod stdio_lockers;
 mod stdio_raw;
 
-pub use buf_reader_line_writer::BufReaderLineWriter;
-pub use buf_reader_writer::BufReaderWriter;
+pub use buffered::{BufReaderLineWriter, BufReaderWriter, IntoInnerError};
 pub use input_byte_stream::InputByteStream;
 pub use interactive_byte_stream::InteractiveByteStream;
 pub use output_byte_stream::OutputByteStream;

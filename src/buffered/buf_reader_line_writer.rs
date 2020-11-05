@@ -2,34 +2,36 @@
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
 use std::fmt;
-use std::io::{self, IoSlice, Write};
-use super::{BufWriter, IntoInnerError, LineWriterShim};
+use std::io::{self, BufRead, IoSlice, IoSliceMut, Read, Write};
+use super::{BufReaderWriter, IntoInnerError, BufReaderLineWriterShim};
 use crate::ReadWrite;
 
-/// Wraps a writer and buffers output to it, flushing whenever a newline
-/// (`0x0a`, `'\n'`) is detected.
+/// Wraps a reader and writer and buffers input and output to and from it, flushing
+/// the writer whenever a newline (`0x0a`, `'\n'`) is detected on output.
 ///
-/// The [`BufWriter`] struct wraps a writer and buffers its output.
+/// The [`BufReaderWriter`] struct wraps a reader and writer and buffers their input and output.
 /// But it only does this batched write when it goes out of scope, or when the
 /// internal buffer is full. Sometimes, you'd prefer to write each line as it's
-/// completed, rather than the entire buffer at once. Enter `LineWriter`. It
+/// completed, rather than the entire buffer at once. Enter `BufReaderLineWriter`. It
 /// does exactly that.
 ///
-/// Like [`BufWriter`], a `LineWriter`’s buffer will also be flushed when the
-/// `LineWriter` goes out of scope or when its internal buffer is full.
+/// Like [`BufReaderWriter`], a `BufReaderLineWriter`’s buffer will also be flushed when the
+/// `BufReaderLineWriter` goes out of scope or when its internal buffer is full.
 ///
-/// If there's still a partial line in the buffer when the `LineWriter` is
+/// If there's still a partial line in the buffer when the `BufReaderLineWriter` is
 /// dropped, it will flush those contents.
 ///
 /// # Examples
 ///
-/// We can use `LineWriter` to write one line at a time, significantly
+/// We can use `BufReaderLineWriter` to write one line at a time, significantly
 /// reducing the number of actual writes to the file.
 ///
 /// ```no_run
-/// use std::fs::{self, File};
-/// use std::io::prelude::*;
-/// use std::io::LineWriter;
+/// use nameless::BufReaderLineWriter;
+/// use std::{
+///     fs::{self, File},
+///     io::prelude::*,
+/// };
 ///
 /// fn main() -> std::io::Result<()> {
 ///     let road_not_taken = b"I shall be telling this with a sigh
@@ -39,7 +41,7 @@ use crate::ReadWrite;
 /// And that has made all the difference.";
 ///
 ///     let file = File::create("poem.txt")?;
-///     let mut file = LineWriter::new(file);
+///     let mut file = BufReaderLineWriter::new(file);
 ///
 ///     file.write_all(b"I shall be telling this with a sigh")?;
 ///
@@ -59,7 +61,7 @@ use crate::ReadWrite;
 /// And that has made all the difference.")?;
 ///
 ///     // The last line of the poem doesn't end in a newline, so
-///     // we have to flush or drop the `LineWriter` to finish
+///     // we have to flush or drop the `BufReaderLineWriter` to finish
 ///     // writing.
 ///     file.flush()?;
 ///
@@ -68,47 +70,47 @@ use crate::ReadWrite;
 ///     Ok(())
 /// }
 /// ```
-pub struct LineWriter<RW: ReadWrite> {
-    inner: BufWriter<RW>,
+pub struct BufReaderLineWriter<RW: ReadWrite> {
+    inner: BufReaderWriter<RW>,
 }
 
-impl<RW: ReadWrite> LineWriter<RW> {
-    /// Creates a new `LineWriter`.
+impl<RW: ReadWrite> BufReaderLineWriter<RW> {
+    /// Creates a new `BufReaderLineWriter`.
     ///
     /// # Examples
     ///
     /// ```no_run
+    /// use nameless::BufReaderLineWriter;
     /// use std::fs::File;
-    /// use std::io::LineWriter;
     ///
     /// fn main() -> std::io::Result<()> {
     ///     let file = File::create("poem.txt")?;
-    ///     let file = LineWriter::new(file);
+    ///     let file = BufReaderLineWriter::new(file);
     ///     Ok(())
     /// }
     /// ```
     pub fn new(inner: RW) -> Self {
-        // Lines typically aren't that long, don't use a giant buffer
-        Self::with_capacity(1024, inner)
+        // Lines typically aren't that long, don't use giant buffers
+        Self::with_capacities(1024, 1024, inner)
     }
 
-    /// Creates a new `LineWriter` with a specified capacity for the internal
-    /// buffer.
+    /// Creates a new `BufReaderLineWriter` with a specified capacities for the internal
+    /// buffers.
     ///
     /// # Examples
     ///
     /// ```no_run
+    /// use nameless::BufReaderLineWriter;
     /// use std::fs::File;
-    /// use std::io::LineWriter;
     ///
     /// fn main() -> std::io::Result<()> {
     ///     let file = File::create("poem.txt")?;
-    ///     let file = LineWriter::with_capacity(100, file);
+    ///     let file = BufReaderLineWriter::with_capacities(10, 100, file);
     ///     Ok(())
     /// }
     /// ```
-    pub fn with_capacity(capacity: usize, inner: RW) -> Self {
-        Self { inner: BufWriter::with_capacity(capacity, inner) }
+    pub fn with_capacities(reader_capacity: usize, writer_capacity: usize, inner: RW) -> Self {
+        Self { inner: BufReaderWriter::with_capacities(reader_capacity, writer_capacity, inner) }
     }
 
     /// Gets a reference to the underlying writer.
@@ -116,12 +118,12 @@ impl<RW: ReadWrite> LineWriter<RW> {
     /// # Examples
     ///
     /// ```no_run
+    /// use nameless::BufReaderLineWriter;
     /// use std::fs::File;
-    /// use std::io::LineWriter;
     ///
     /// fn main() -> std::io::Result<()> {
     ///     let file = File::create("poem.txt")?;
-    ///     let file = LineWriter::new(file);
+    ///     let file = BufReaderLineWriter::new(file);
     ///
     ///     let reference = file.get_ref();
     ///     Ok(())
@@ -140,12 +142,12 @@ impl<RW: ReadWrite> LineWriter<RW> {
     /// # Examples
     ///
     /// ```no_run
+    /// use nameless::BufReaderLineWriter;
     /// use std::fs::File;
-    /// use std::io::LineWriter;
     ///
     /// fn main() -> std::io::Result<()> {
     ///     let file = File::create("poem.txt")?;
-    ///     let mut file = LineWriter::new(file);
+    ///     let mut file = BufReaderLineWriter::new(file);
     ///
     ///     // we can use reference just like file
     ///     let reference = file.get_mut();
@@ -157,7 +159,7 @@ impl<RW: ReadWrite> LineWriter<RW> {
         self.inner.get_mut()
     }
 
-    /// Unwraps this `LineWriter`, returning the underlying writer.
+    /// Unwraps this `BufReaderLineWriter`, returning the underlying writer.
     ///
     /// The internal buffer is written out before returning the writer.
     ///
@@ -168,13 +170,13 @@ impl<RW: ReadWrite> LineWriter<RW> {
     /// # Examples
     ///
     /// ```no_run
+    /// use nameless::BufReaderLineWriter;
     /// use std::fs::File;
-    /// use std::io::LineWriter;
     ///
     /// fn main() -> std::io::Result<()> {
     ///     let file = File::create("poem.txt")?;
     ///
-    ///     let writer: LineWriter<File> = LineWriter::new(file);
+    ///     let writer: BufReaderLineWriter<File> = BufReaderLineWriter::new(file);
     ///
     ///     let file: File = writer.into_inner()?;
     ///     Ok(())
@@ -185,10 +187,10 @@ impl<RW: ReadWrite> LineWriter<RW> {
     }
 }
 
-impl<RW: ReadWrite> Write for LineWriter<RW> {
+impl<RW: ReadWrite> Write for BufReaderLineWriter<RW> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        LineWriterShim::new(&mut self.inner).write(buf)
+        BufReaderLineWriterShim::new(&mut self.inner).write(buf)
     }
 
     #[inline]
@@ -198,7 +200,7 @@ impl<RW: ReadWrite> Write for LineWriter<RW> {
 
     #[inline]
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        LineWriterShim::new(&mut self.inner).write_vectored(bufs)
+        BufReaderLineWriterShim::new(&mut self.inner).write_vectored(bufs)
     }
 
     #[cfg(feature = "nightly")]
@@ -209,31 +211,72 @@ impl<RW: ReadWrite> Write for LineWriter<RW> {
 
     #[inline]
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        LineWriterShim::new(&mut self.inner).write_all(buf)
+        BufReaderLineWriterShim::new(&mut self.inner).write_all(buf)
     }
 
     #[cfg(feature = "nightly")]
     #[inline]
     fn write_all_vectored(&mut self, bufs: &mut [IoSlice<'_>]) -> io::Result<()> {
-        LineWriterShim::new(&mut self.inner).write_all_vectored(bufs)
+        BufReaderLineWriterShim::new(&mut self.inner).write_all_vectored(bufs)
     }
 
     #[inline]
     fn write_fmt(&mut self, fmt: fmt::Arguments<'_>) -> io::Result<()> {
-        LineWriterShim::new(&mut self.inner).write_fmt(fmt)
+        BufReaderLineWriterShim::new(&mut self.inner).write_fmt(fmt)
     }
 }
 
-impl<RW: ReadWrite> fmt::Debug for LineWriter<RW>
+impl<RW: ReadWrite> Read for BufReaderLineWriter<RW> {
+    #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.read(buf)
+    }
+
+    #[inline]
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        self.inner.read_vectored(bufs)
+    }
+
+    #[cfg(feature = "nightly")]
+    #[inline]
+    fn is_read_vectored(&self) -> bool {
+        self.inner.is_read_vectored()
+    }
+
+    // we can't skip unconditionally because of the large buffer case in read.
+    #[cfg(feature = "nightly")]
+    #[inline]
+    unsafe fn initializer(&self) -> Initializer {
+        self.inner.initializer()
+    }
+}
+
+impl<RW: ReadWrite> BufRead for BufReaderLineWriter<RW> {
+    #[inline]
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        self.inner.fill_buf()
+    }
+
+    #[inline]
+    fn consume(&mut self, amt: usize) {
+        self.inner.consume(amt)
+    }
+}
+
+impl<RW: ReadWrite> fmt::Debug for BufReaderLineWriter<RW>
 where
     RW: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("LineWriter")
+        fmt.debug_struct("BufReaderLineWriter")
             .field("inner", &self.get_ref())
             .field(
+                "reader_buffer",
+                &format_args!("{}/{}", self.inner.reader_buffer().len(), self.inner.reader_capacity()),
+            )
+            .field(
                 "writer_buffer",
-                &format_args!("{}/{}", self.inner.buffer().len(), self.inner.capacity()),
+                &format_args!("{}/{}", self.inner.writer_buffer().len(), self.inner.writer_capacity()),
             )
             .finish()
     }

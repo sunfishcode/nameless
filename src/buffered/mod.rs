@@ -3,22 +3,17 @@
 //!
 //! Buffering wrappers for I/O traits
 
-mod bufreader;
-mod bufwriter;
-mod linewriter;
-mod linewritershim;
-
-#[cfg(test)]
-mod tests;
+mod buf_reader_writer;
+mod buf_reader_line_writer;
+mod buf_reader_line_writer_shim;
 
 use std::error;
 use std::fmt;
 use std::io::Error;
 
-pub use bufreader::BufReader;
-pub use bufwriter::BufWriter;
-pub use linewriter::LineWriter;
-use linewritershim::LineWriterShim;
+pub use buf_reader_writer::BufReaderWriter;
+pub use buf_reader_line_writer::BufReaderLineWriter;
+use buf_reader_line_writer_shim::BufReaderLineWriterShim;
 
 /// The value from `library/std/src/sys_common/io.rs`.
 pub(super) const DEFAULT_BUF_SIZE: usize = 8 * 1024;
