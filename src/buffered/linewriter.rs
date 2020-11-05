@@ -196,6 +196,7 @@ impl<RW: ReadWrite> Write for LineWriter<RW> {
         LineWriterShim::new(&mut self.inner).write_vectored(bufs)
     }
 
+    #[cfg(feature = "nightly")]
     fn is_write_vectored(&self) -> bool {
         self.inner.is_write_vectored()
     }
@@ -204,6 +205,7 @@ impl<RW: ReadWrite> Write for LineWriter<RW> {
         LineWriterShim::new(&mut self.inner).write_all(buf)
     }
 
+    #[cfg(feature = "nightly")]
     fn write_all_vectored(&mut self, bufs: &mut [IoSlice<'_>]) -> io::Result<()> {
         LineWriterShim::new(&mut self.inner).write_all_vectored(bufs)
     }

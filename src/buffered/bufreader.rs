@@ -3,7 +3,9 @@
 
 use std::cmp;
 use std::fmt;
-use std::io::{self, BufRead, Initializer, IoSliceMut, Read};
+use std::io::{self, BufRead, IoSliceMut, Read};
+#[cfg(feature = "nightly")]
+use std::io::Initializer;
 use super::DEFAULT_BUF_SIZE;
 use crate::ReadWrite;
 
@@ -90,12 +92,17 @@ impl<RW: ReadWrite> BufReader<RW> {
     /// }
     /// ```
     pub fn with_capacity(capacity: usize, inner: RW) -> Self {
-        unsafe {
+        #[cfg(not(feature = "nightly"))]
+        let buffer = vec![0; capacity];
+        #[cfg(feature = "nightly")]
+        let buffer = unsafe {
             let mut buffer = Vec::with_capacity(capacity);
             buffer.set_len(capacity);
             inner.initializer().initialize(&mut buffer);
-            Self { inner, reader_buf: buffer.into_boxed_slice(), pos: 0, cap: 0 }
-        }
+            buffer
+        };
+
+        Self { inner, reader_buf: buffer.into_boxed_slice(), pos: 0, cap: 0 }
     }
 }
 
@@ -255,11 +262,13 @@ impl<RW: ReadWrite> Read for BufReader<RW> {
         Ok(nread)
     }
 
+    #[cfg(feature = "nightly")]
     fn is_read_vectored(&self) -> bool {
         self.inner.is_read_vectored()
     }
 
     // we can't skip unconditionally because of the large buffer case in read.
+    #[cfg(feature = "nightly")]
     unsafe fn initializer(&self) -> Initializer {
         self.inner.initializer()
     }

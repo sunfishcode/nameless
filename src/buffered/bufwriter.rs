@@ -339,6 +339,7 @@ impl<RW: ReadWrite> Write for BufWriter<RW> {
         }
     }
 
+    #[cfg(feature = "nightly")]
     fn is_write_vectored(&self) -> bool {
         self.get_ref().is_write_vectored()
     }

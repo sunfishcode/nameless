@@ -165,6 +165,7 @@ impl<'a, RW: ReadWrite> Write for LineWriterShim<'a, RW> {
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         // If there's no specialized behavior for write_vectored, just use
         // write. This has the benefit of more granular partial-line handling.
+        #[cfg(feature = "nightly")]
         if !self.is_write_vectored() {
             return match bufs.iter().find(|buf| !buf.is_empty()) {
                 Some(buf) => self.write(buf),
@@ -230,6 +231,7 @@ impl<'a, RW: ReadWrite> Write for LineWriterShim<'a, RW> {
         Ok(flushed + buffered)
     }
 
+    #[cfg(feature = "nightly")]
     fn is_write_vectored(&self) -> bool {
         self.buffer.is_write_vectored()
     }
