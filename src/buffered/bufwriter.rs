@@ -199,6 +199,7 @@ impl<RW: ReadWrite> BufWriter<RW> {
     /// // we can use reference just like buffer
     /// let reference = buffer.get_ref();
     /// ```
+    #[inline]
     pub fn get_ref(&self) -> &RW {
         self.inner.as_ref().unwrap()
     }
@@ -218,6 +219,7 @@ impl<RW: ReadWrite> BufWriter<RW> {
     /// // we can use reference just like buffer
     /// let reference = buffer.get_mut();
     /// ```
+    #[inline]
     pub fn get_mut(&mut self) -> &mut RW {
         self.inner.as_mut().unwrap()
     }
@@ -235,6 +237,7 @@ impl<RW: ReadWrite> BufWriter<RW> {
     /// // See how many bytes are currently buffered
     /// let bytes_buffered = buf_writer.buffer().len();
     /// ```
+    #[inline]
     pub fn buffer(&self) -> &[u8] {
         &self.writer_buf
     }
@@ -254,6 +257,7 @@ impl<RW: ReadWrite> BufWriter<RW> {
     /// // Calculate how many bytes can be written without flushing
     /// let without_flush = capacity - buf_writer.buffer().len();
     /// ```
+    #[inline]
     pub fn capacity(&self) -> usize {
         self.writer_buf.capacity()
     }
@@ -340,10 +344,12 @@ impl<RW: ReadWrite> Write for BufWriter<RW> {
     }
 
     #[cfg(feature = "nightly")]
+    #[inline]
     fn is_write_vectored(&self) -> bool {
         self.get_ref().is_write_vectored()
     }
 
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.flush_buf().and_then(|()| self.get_mut().flush())
     }

@@ -125,6 +125,7 @@ impl<RW> BufReader<RW> {
     ///     Ok(())
     /// }
     /// ```
+    #[inline]
     pub fn get_ref(&self) -> &RW {
         &self.inner
     }
@@ -147,6 +148,7 @@ impl<RW> BufReader<RW> {
     ///     Ok(())
     /// }
     /// ```
+    #[inline]
     pub fn get_mut(&mut self) -> &mut RW {
         &mut self.inner
     }
@@ -174,6 +176,7 @@ impl<RW> BufReader<RW> {
     ///     Ok(())
     /// }
     /// ```
+    #[inline]
     pub fn buffer(&self) -> &[u8] {
         &self.reader_buf[self.pos..self.cap]
     }
@@ -196,6 +199,7 @@ impl<RW> BufReader<RW> {
     ///     Ok(())
     /// }
     /// ```
+    #[inline]
     pub fn capacity(&self) -> usize {
         self.reader_buf.len()
     }
@@ -219,6 +223,7 @@ impl<RW> BufReader<RW> {
     ///     Ok(())
     /// }
     /// ```
+    #[inline]
     pub fn into_inner(self) -> RW {
         self.inner
     }
@@ -263,12 +268,14 @@ impl<RW: ReadWrite> Read for BufReader<RW> {
     }
 
     #[cfg(feature = "nightly")]
+    #[inline]
     fn is_read_vectored(&self) -> bool {
         self.inner.is_read_vectored()
     }
 
     // we can't skip unconditionally because of the large buffer case in read.
     #[cfg(feature = "nightly")]
+    #[inline]
     unsafe fn initializer(&self) -> Initializer {
         self.inner.initializer()
     }
@@ -288,6 +295,7 @@ impl<RW: ReadWrite> BufRead for BufReader<RW> {
         Ok(&self.reader_buf[self.pos..self.cap])
     }
 
+    #[inline]
     fn consume(&mut self, amt: usize) {
         self.pos = cmp::min(self.pos + amt, self.cap);
     }

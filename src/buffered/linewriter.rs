@@ -127,6 +127,7 @@ impl<RW: ReadWrite> LineWriter<RW> {
     ///     Ok(())
     /// }
     /// ```
+    #[inline]
     pub fn get_ref(&self) -> &RW {
         self.inner.get_ref()
     }
@@ -151,6 +152,7 @@ impl<RW: ReadWrite> LineWriter<RW> {
     ///     Ok(())
     /// }
     /// ```
+    #[inline]
     pub fn get_mut(&mut self) -> &mut RW {
         self.inner.get_mut()
     }
@@ -184,32 +186,39 @@ impl<RW: ReadWrite> LineWriter<RW> {
 }
 
 impl<RW: ReadWrite> Write for LineWriter<RW> {
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         LineWriterShim::new(&mut self.inner).write(buf)
     }
 
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
     }
 
+    #[inline]
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         LineWriterShim::new(&mut self.inner).write_vectored(bufs)
     }
 
     #[cfg(feature = "nightly")]
+    #[inline]
     fn is_write_vectored(&self) -> bool {
         self.inner.is_write_vectored()
     }
 
+    #[inline]
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
         LineWriterShim::new(&mut self.inner).write_all(buf)
     }
 
     #[cfg(feature = "nightly")]
+    #[inline]
     fn write_all_vectored(&mut self, bufs: &mut [IoSlice<'_>]) -> io::Result<()> {
         LineWriterShim::new(&mut self.inner).write_all_vectored(bufs)
     }
 
+    #[inline]
     fn write_fmt(&mut self, fmt: fmt::Arguments<'_>) -> io::Result<()> {
         LineWriterShim::new(&mut self.inner).write_fmt(fmt)
     }

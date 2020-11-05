@@ -20,6 +20,7 @@ pub struct LineWriterShim<'a, RW: ReadWrite> {
 }
 
 impl<'a, RW: ReadWrite> LineWriterShim<'a, RW> {
+    #[inline]
     pub fn new(buffer: &'a mut BufWriter<RW>) -> Self {
         Self { buffer }
     }
@@ -27,11 +28,13 @@ impl<'a, RW: ReadWrite> LineWriterShim<'a, RW> {
     /// Get a mutable reference to the inner writer (that is, the writer
     /// wrapped by the BufWriter). Be careful with this writer, as writes to
     /// it will bypass the buffer.
+    #[inline]
     fn inner_mut(&mut self) -> &mut RW {
         self.buffer.get_mut()
     }
 
     /// Get the content currently buffered in self.buffer
+    #[inline]
     fn buffered(&self) -> &[u8] {
         self.buffer.buffer()
     }
@@ -130,6 +133,7 @@ impl<'a, RW: ReadWrite> Write for LineWriterShim<'a, RW> {
         Ok(flushed + buffered)
     }
 
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.buffer.flush()
     }
@@ -232,6 +236,7 @@ impl<'a, RW: ReadWrite> Write for LineWriterShim<'a, RW> {
     }
 
     #[cfg(feature = "nightly")]
+    #[inline]
     fn is_write_vectored(&self) -> bool {
         self.buffer.is_write_vectored()
     }
