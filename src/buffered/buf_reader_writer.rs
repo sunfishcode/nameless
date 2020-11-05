@@ -474,6 +474,9 @@ impl<RW: ReadWrite> Write for BufReaderWriter<RW> {
 
 impl<RW: ReadWrite> Read for BufReaderWriter<RW> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        // Flush the writer half of this `BufReaderWriter` before reading.
+        self.flush()?;
+
         // If we don't have any buffered data and we're doing a massive read
         // (larger than our internal buffer), bypass our internal buffer
         // entirely.
@@ -490,6 +493,9 @@ impl<RW: ReadWrite> Read for BufReaderWriter<RW> {
     }
 
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        // Flush the writer half of this `BufReaderWriter` before reading.
+        self.flush()?;
+
         let total_len = bufs.iter().map(|b| b.len()).sum::<usize>();
         if self.pos == self.cap && total_len >= self.reader_buf.len() {
             self.discard_reader_buffer();
@@ -522,6 +528,9 @@ impl<RW: ReadWrite> BufRead for BufReaderWriter<RW> {
         // Branch using `>=` instead of the more correct `==`
         // to tell the compiler that the pos..cap slice is always valid.
         if self.pos >= self.cap {
+            // Flush the writer half of this `BufReaderWriter` before reading.
+            self.flush()?;
+
             debug_assert!(self.pos == self.cap);
             self.cap = self.inner.as_mut().unwrap().read(&mut self.reader_buf)?;
             self.pos = 0;
