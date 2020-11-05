@@ -1,9 +1,13 @@
+//! Define `StdinStdout`, an interactive stream object formed by combining
+//! stdin and stdout.
+
 use crate::stdio_raw::{StdinRaw, StdoutRaw};
 use std::{
     fmt::Arguments,
     io::{self, IoSlice, IoSliceMut, Read, Write},
 };
 
+/// A raw (stdin, stdout) pair which can implement the `ReadWrite` trait.
 pub(crate) struct StdinStdout {
     stdin: StdinRaw,
     stdout: StdoutRaw,

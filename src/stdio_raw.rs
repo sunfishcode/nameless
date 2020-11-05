@@ -1,3 +1,13 @@
+//! Raw unbuffered versions of `Stdin` and `Stdout`.
+//!
+//! Rust's `Stdin` and `Stdout` are buffered, because for normal applications,
+//! buffering is a good thing. This library is abstracting over stdin/stdout
+//! pairs, which Rust buffers, and sockets, which Rust doesn't buffer. So we
+//! define our own versions of `Stdin` and `Stdout` so that we consistently
+//! don't buffer, and buffering can be consistently applied on top.
+//!
+//! To add buffering, see `BufReaderWriter` or `BufReaderLineWriter`.
+
 use crate::stdio_lockers::{StdinLocker, StdoutLocker};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
@@ -10,11 +20,19 @@ use std::{
     mem::ManuallyDrop,
 };
 
+/// Raw unbuffered stdin. Contrast with `std::io::Stdin` which is buffered.
+///
+/// This acquires a `StdinLocker` to prevent accesses to `std::io::Stdin`
+/// while this is live.
 pub(crate) struct StdinRaw {
     file: ManuallyDrop<File>,
     _locker: StdinLocker,
 }
 
+/// Raw unbuffered stdout. Contrast with `std::io::Stdout` which is buffered.
+///
+/// This acquires a `StdoutLocker` to prevent accesses to `std::io::Stdout`
+/// while this is live.
 pub(crate) struct StdoutRaw {
     file: ManuallyDrop<File>,
     _locker: StdoutLocker,
