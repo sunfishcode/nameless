@@ -1,10 +1,12 @@
 //! This file is derived from Rust's library/std/src/io/buffered at revision
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
-use std::fmt;
-use std::io::{self, BufRead, IoSlice, IoSliceMut, Read, Write};
-use super::{BufReaderWriter, IntoInnerError, BufReaderLineWriterShim};
+use super::{BufReaderLineWriterShim, BufReaderWriter, IntoInnerError};
 use crate::ReadWrite;
+use std::{
+    fmt,
+    io::{self, BufRead, IoSlice, IoSliceMut, Read, Write},
+};
 
 /// Wraps a reader and writer and buffers input and output to and from it, flushing
 /// the writer whenever a newline (`0x0a`, `'\n'`) is detected on output.
@@ -110,7 +112,9 @@ impl<RW: ReadWrite> BufReaderLineWriter<RW> {
     /// }
     /// ```
     pub fn with_capacities(reader_capacity: usize, writer_capacity: usize, inner: RW) -> Self {
-        Self { inner: BufReaderWriter::with_capacities(reader_capacity, writer_capacity, inner) }
+        Self {
+            inner: BufReaderWriter::with_capacities(reader_capacity, writer_capacity, inner),
+        }
     }
 
     /// Gets a reference to the underlying writer.
@@ -183,7 +187,9 @@ impl<RW: ReadWrite> BufReaderLineWriter<RW> {
     /// }
     /// ```
     pub fn into_inner(self) -> Result<RW, IntoInnerError<Self>> {
-        self.inner.into_inner().map_err(|err| err.new_wrapped(|inner| Self { inner }))
+        self.inner
+            .into_inner()
+            .map_err(|err| err.new_wrapped(|inner| Self { inner }))
     }
 }
 
@@ -272,11 +278,19 @@ where
             .field("inner", &self.get_ref())
             .field(
                 "reader_buffer",
-                &format_args!("{}/{}", self.inner.reader_buffer().len(), self.inner.reader_capacity()),
+                &format_args!(
+                    "{}/{}",
+                    self.inner.reader_buffer().len(),
+                    self.inner.reader_capacity()
+                ),
             )
             .field(
                 "writer_buffer",
-                &format_args!("{}/{}", self.inner.writer_buffer().len(), self.inner.writer_capacity()),
+                &format_args!(
+                    "{}/{}",
+                    self.inner.writer_buffer().len(),
+                    self.inner.writer_capacity()
+                ),
             )
             .finish()
     }

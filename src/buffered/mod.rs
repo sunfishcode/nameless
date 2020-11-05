@@ -3,17 +3,15 @@
 //!
 //! Buffering wrappers for I/O traits
 
-mod buf_reader_writer;
 mod buf_reader_line_writer;
 mod buf_reader_line_writer_shim;
+mod buf_reader_writer;
 
-use std::error;
-use std::fmt;
-use std::io::Error;
+use std::{error, fmt, io::Error};
 
-pub use buf_reader_writer::BufReaderWriter;
 pub use buf_reader_line_writer::BufReaderLineWriter;
 use buf_reader_line_writer_shim::BufReaderLineWriterShim;
+pub use buf_reader_writer::BufReaderWriter;
 
 /// The value from `library/std/src/sys_common/io.rs`.
 pub(super) const DEFAULT_BUF_SIZE: usize = 8 * 1024;
@@ -25,8 +23,7 @@ pub(super) const DEFAULT_BUF_SIZE: usize = 8 * 1024;
 /// # Examples
 ///
 /// ```no_run
-/// use std::io::BufWriter;
-/// use std::net::TcpStream;
+/// use std::{io::BufWriter, net::TcpStream};
 ///
 /// let mut stream = BufWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
 ///
@@ -66,8 +63,7 @@ impl<W> IntoInnerError<W> {
     /// # Examples
     ///
     /// ```no_run
-    /// use std::io::BufWriter;
-    /// use std::net::TcpStream;
+    /// use std::{io::BufWriter, net::TcpStream};
     ///
     /// let mut stream = BufWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     ///
@@ -99,8 +95,7 @@ impl<W> IntoInnerError<W> {
     /// # Examples
     ///
     /// ```no_run
-    /// use std::io::BufWriter;
-    /// use std::net::TcpStream;
+    /// use std::{io::BufWriter, net::TcpStream};
     ///
     /// let mut stream = BufWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     ///

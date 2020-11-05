@@ -1,15 +1,14 @@
 //! This file is derived from Rust's library/std/src/io/buffered at revision
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
-use std::cmp;
-use std::fmt;
-use std::io::{
-    self, BufRead, Error, ErrorKind, IoSlice, IoSliceMut, Read, Write,
-};
+use super::{IntoInnerError, DEFAULT_BUF_SIZE};
+use crate::ReadWrite;
 #[cfg(feature = "nightly")]
 use std::io::Initializer;
-use super::{DEFAULT_BUF_SIZE, IntoInnerError};
-use crate::ReadWrite;
+use std::{
+    cmp, fmt,
+    io::{self, BufRead, Error, ErrorKind, IoSlice, IoSliceMut, Read, Write},
+};
 
 /// Wraps a reader and writer and buffers their output.
 ///
@@ -53,13 +52,12 @@ use crate::ReadWrite;
 /// Let's write the numbers one through ten to a [`TcpStream`]:
 ///
 /// ```no_run
-/// use std::io::prelude::*;
-/// use std::net::TcpStream;
+/// use std::{io::prelude::*, net::TcpStream};
 ///
 /// let mut stream = TcpStream::connect("127.0.0.1:34254").unwrap();
 ///
 /// for i in 0..10 {
-///     stream.write(&[i+1]).unwrap();
+///     stream.write(&[i + 1]).unwrap();
 /// }
 /// ```
 ///
@@ -68,14 +66,13 @@ use crate::ReadWrite;
 /// `BufReaderWriter<RW>`:
 ///
 /// ```no_run
-/// use std::io::prelude::*;
-/// use std::net::TcpStream;
 /// use nameless::BufReaderWriter;
+/// use std::{io::prelude::*, net::TcpStream};
 ///
 /// let mut stream = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
 ///
 /// for i in 0..10 {
-///     stream.write(&[i+1]).unwrap();
+///     stream.write(&[i + 1]).unwrap();
 /// }
 /// stream.flush().unwrap();
 /// ```
@@ -85,9 +82,8 @@ use crate::ReadWrite;
 /// the `stream` is flushed.
 ///
 /// ```no_run
-/// use std::io::prelude::*;
-/// use std::net::TcpStream;
 /// use nameless::BufReaderWriter;
+/// use std::{io::prelude::*, net::TcpStream};
 ///
 /// fn main() -> std::io::Result<()> {
 ///     let mut stream = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
@@ -124,8 +120,8 @@ impl<RW: ReadWrite> BufReaderWriter<RW> {
     /// # Examples
     ///
     /// ```no_run
-    /// use std::net::TcpStream;
     /// use nameless::BufReaderWriter;
+    /// use std::net::TcpStream;
     ///
     /// let mut buffer = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     /// ```
@@ -140,8 +136,8 @@ impl<RW: ReadWrite> BufReaderWriter<RW> {
     /// Creating a buffer with ten bytes of reader capacity and a writer buffer of a hundered bytes:
     ///
     /// ```no_run
-    /// use std::net::TcpStream;
     /// use nameless::BufReaderWriter;
+    /// use std::net::TcpStream;
     ///
     /// let stream = TcpStream::connect("127.0.0.1:34254").unwrap();
     /// let mut buffer = BufReaderWriter::with_capacities(10, 100, stream);
@@ -310,9 +306,8 @@ impl<RW: ReadWrite> BufReaderWriter<RW> {
     /// # Examples
     ///
     /// ```no_run
-    /// use std::io::BufRead;
-    /// use std::fs::File;
     /// use nameless::BufReaderWriter;
+    /// use std::{fs::File, io::BufRead};
     ///
     /// fn main() -> std::io::Result<()> {
     ///     let f = File::open("log.txt")?;
@@ -334,8 +329,8 @@ impl<RW: ReadWrite> BufReaderWriter<RW> {
     /// # Examples
     ///
     /// ```no_run
-    /// use std::net::TcpStream;
     /// use nameless::BufReaderWriter;
+    /// use std::net::TcpStream;
     ///
     /// let buf_reader_writer = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     ///
@@ -354,9 +349,8 @@ impl<RW: ReadWrite> BufReaderWriter<RW> {
     /// # Examples
     ///
     /// ```no_run
-    /// use std::io::BufRead;
-    /// use std::fs::File;
     /// use nameless::BufReaderWriter;
+    /// use std::{fs::File, io::BufRead};
     ///
     /// fn main() -> std::io::Result<()> {
     ///     let f = File::open("log.txt")?;
@@ -383,8 +377,8 @@ impl<RW: ReadWrite> BufReaderWriter<RW> {
     /// # Examples
     ///
     /// ```no_run
-    /// use std::net::TcpStream;
     /// use nameless::BufReaderWriter;
+    /// use std::net::TcpStream;
     ///
     /// let mut buffer = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     ///
@@ -455,7 +449,8 @@ impl<RW: ReadWrite> Write for BufReaderWriter<RW> {
             self.panicked = false;
             r
         } else {
-            bufs.iter().for_each(|b| self.writer_buf.extend_from_slice(b));
+            bufs.iter()
+                .for_each(|b| self.writer_buf.extend_from_slice(b));
             Ok(total_len)
         }
     }
@@ -550,8 +545,14 @@ where
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("BufReaderWriter")
             .field("inner", &self.inner.as_ref().unwrap())
-            .field("reader_buffer", &format_args!("{}/{}", self.cap - self.pos, self.reader_buf.len()))
-            .field("writer_buffer", &format_args!("{}/{}", self.writer_buf.len(), self.writer_buf.capacity()))
+            .field(
+                "reader_buffer",
+                &format_args!("{}/{}", self.cap - self.pos, self.reader_buf.len()),
+            )
+            .field(
+                "writer_buffer",
+                &format_args!("{}/{}", self.writer_buf.len(), self.writer_buf.capacity()),
+            )
             .finish()
     }
 }
