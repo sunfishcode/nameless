@@ -22,15 +22,15 @@ static STDOUT: Lazy<Stdout> = Lazy::new(stdout);
 static STDIN_CLAIMED: AtomicBool = AtomicBool::new(false);
 static STDOUT_CLAIMED: AtomicBool = AtomicBool::new(false);
 
+/// This class acquires a lock on `stdin` and prevents applications from
+/// accidentally accessing it through other means.
 pub(crate) struct StdinLocker {
-    lock: StdinLock<'static>,
+    _lock: StdinLock<'static>,
 }
 
+/// This class acquires a lock on `stdout` and prevents applications from
+/// accidentally accessing it through other means.
 pub(crate) struct StdoutLocker {
-    #[cfg(not(windows))]
-    raw_fd: RawFd,
-    #[cfg(windows)]
-    raw_handle: RawHandle,
     unparker: Unparker,
     handle: Option<JoinHandle<()>>,
 }
@@ -43,7 +43,9 @@ impl StdinLocker {
     /// Return `None` if a `StdinLocker` instance already exists.
     pub(crate) fn new() -> Option<Self> {
         if !STDIN_CLAIMED.compare_and_swap(false, true, SeqCst) {
-            Some(Self { lock: STDIN.lock() })
+            Some(Self {
+                _lock: STDIN.lock(),
+            })
         } else {
             None
         }
@@ -58,11 +60,6 @@ impl StdoutLocker {
     /// Return `None` if a `StdoutLocker` instance already exists.
     pub(crate) fn new() -> Option<Self> {
         if !STDOUT_CLAIMED.compare_and_swap(false, true, SeqCst) {
-            #[cfg(not(windows))]
-            let raw_fd = STDOUT.as_raw_fd();
-            #[cfg(windows)]
-            let raw_handle = STDOUT.as_raw_handle();
-
             // Unlike `stdin`, `stdout` is locked with a reentrent mutex, so in
             // order to prevent other uses of it, create a thread and have it
             // acquire the lock and park.
@@ -79,14 +76,7 @@ impl StdoutLocker {
                     .ok()?,
             );
 
-            Some(Self {
-                #[cfg(not(windows))]
-                raw_fd,
-                #[cfg(windows)]
-                raw_handle,
-                unparker,
-                handle,
-            })
+            Some(Self { unparker, handle })
         } else {
             None
         }
@@ -113,7 +103,7 @@ impl Drop for StdoutLocker {
 impl AsRawFd for StdinLocker {
     #[inline]
     fn as_raw_fd(&self) -> RawFd {
-        self.lock.as_raw_fd()
+        STDIN.as_raw_fd()
     }
 }
 
@@ -121,7 +111,7 @@ impl AsRawFd for StdinLocker {
 impl AsRawFd for StdoutLocker {
     #[inline]
     fn as_raw_fd(&self) -> RawFd {
-        self.raw_fd
+        STDOUT.as_raw_fd()
     }
 }
 
@@ -129,7 +119,7 @@ impl AsRawFd for StdoutLocker {
 impl AsRawHandle for StdinLocker {
     #[inline]
     fn as_raw_handle(&self) -> RawHandle {
-        self.lock.as_raw_handle()
+        STDIN.as_raw_handle()
     }
 }
 
@@ -137,6 +127,6 @@ impl AsRawHandle for StdinLocker {
 impl AsRawHandle for StdoutLocker {
     #[inline]
     fn as_raw_handle(&self) -> RawHandle {
-        self.raw_handle
+        STDOUT.as_raw_handle()
     }
 }
