@@ -124,7 +124,7 @@ impl<'a, RW: ReadWrite> Write for BufReaderLineWriterShim<'a, RW> {
             let scan_area = &buf[flushed..];
             let scan_area = &scan_area[..self.buffer.writer_capacity()];
             match memchr::memrchr(b'\n', scan_area) {
-                Some(newline_idx) => &scan_area[..newline_idx + 1],
+                Some(newline_idx) => &scan_area[..=newline_idx],
                 None => scan_area,
             }
         };
