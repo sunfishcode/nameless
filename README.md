@@ -23,8 +23,8 @@ This library provides:
  - New stream types, [`InputByteStream`], [`OutputByteStream`], and
    [`InteractiveByteStream`], which implement [`Read`], [`Write`], and both,
    respectively, which you can use in type-aware command-line parsing
-   packages such as [`structopt`], [`clap-v3`], or this library's own
-   [`kommand`].
+   packages such as [`structopt`], [`clap-v3`], [`argh`], [`gumdrop`], or this
+   library's own [`kommand`].
 
  - A new command-line parsing package, [`kommand`], which is similar to
    (and built on) [`structopt`] with [`paw`] support enabled, but which goes
@@ -47,6 +47,8 @@ deterministic-build environments.
 
 [`structopt`]: https://crates.io/crates/structopt
 [`clap-v3`]: https://crates.io/crates/clap-v3
+[`argh`]: https://crates.io/crates/argh
+[`gumdrop`]: https://crates.io/crates/gumdrop
 [`paw`]: https://crates.io/crates/paw
 [`kommand`]: https://crates.io/crates/kommand
 [`BufReader`]: https://doc.rust-lang.org/stable/std/io/struct.BufReader.html
