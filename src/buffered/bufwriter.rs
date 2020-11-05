@@ -88,8 +88,8 @@ impl<RW: ReadWrite> BufWriter<RW> {
     ///
     /// let mut buffer = BufWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     /// ```
-    pub fn new(inner: RW) -> BufWriter<RW> {
-        BufWriter::with_capacity(DEFAULT_BUF_SIZE, inner)
+    pub fn new(inner: RW) -> Self {
+        Self::with_capacity(DEFAULT_BUF_SIZE, inner)
     }
 
     /// Creates a new `BufWriter<RW>` with the specified buffer capacity.
@@ -105,8 +105,8 @@ impl<RW: ReadWrite> BufWriter<RW> {
     /// let stream = TcpStream::connect("127.0.0.1:34254").unwrap();
     /// let mut buffer = BufWriter::with_capacity(100, stream);
     /// ```
-    pub fn with_capacity(capacity: usize, inner: RW) -> BufWriter<RW> {
-        BufWriter { inner: Some(inner), writer_buf: Vec::with_capacity(capacity), panicked: false }
+    pub fn with_capacity(capacity: usize, inner: RW) -> Self {
+        Self { inner: Some(inner), writer_buf: Vec::with_capacity(capacity), panicked: false }
     }
 
     /// Send data in our local buffer into the inner writer, looping as
@@ -277,7 +277,7 @@ impl<RW: ReadWrite> BufWriter<RW> {
     /// // unwrap the TcpStream and flush the buffer
     /// let stream = buffer.into_inner().unwrap();
     /// ```
-    pub fn into_inner(mut self) -> Result<RW, IntoInnerError<BufWriter<RW>>> {
+    pub fn into_inner(mut self) -> Result<RW, IntoInnerError<Self>> {
         match self.flush_buf() {
             Err(e) => Err(IntoInnerError::new(self, e)),
             Ok(()) => Ok(self.inner.take().unwrap()),

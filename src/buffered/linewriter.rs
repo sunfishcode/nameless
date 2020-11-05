@@ -87,9 +87,9 @@ impl<RW: ReadWrite> LineWriter<RW> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn new(inner: RW) -> LineWriter<RW> {
+    pub fn new(inner: RW) -> Self {
         // Lines typically aren't that long, don't use a giant buffer
-        LineWriter::with_capacity(1024, inner)
+        Self::with_capacity(1024, inner)
     }
 
     /// Creates a new `LineWriter` with a specified capacity for the internal
@@ -107,8 +107,8 @@ impl<RW: ReadWrite> LineWriter<RW> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn with_capacity(capacity: usize, inner: RW) -> LineWriter<RW> {
-        LineWriter { inner: BufWriter::with_capacity(capacity, inner) }
+    pub fn with_capacity(capacity: usize, inner: RW) -> Self {
+        Self { inner: BufWriter::with_capacity(capacity, inner) }
     }
 
     /// Gets a reference to the underlying writer.
@@ -178,8 +178,8 @@ impl<RW: ReadWrite> LineWriter<RW> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn into_inner(self) -> Result<RW, IntoInnerError<LineWriter<RW>>> {
-        self.inner.into_inner().map_err(|err| err.new_wrapped(|inner| LineWriter { inner }))
+    pub fn into_inner(self) -> Result<RW, IntoInnerError<Self>> {
+        self.inner.into_inner().map_err(|err| err.new_wrapped(|inner| Self { inner }))
     }
 }
 

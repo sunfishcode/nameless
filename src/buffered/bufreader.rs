@@ -69,8 +69,8 @@ impl<RW: ReadWrite> BufReader<RW> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn new(inner: RW) -> BufReader<RW> {
-        BufReader::with_capacity(DEFAULT_BUF_SIZE, inner)
+    pub fn new(inner: RW) -> Self {
+        Self::with_capacity(DEFAULT_BUF_SIZE, inner)
     }
 
     /// Creates a new `BufReader<RW>` with the specified buffer capacity.
@@ -89,12 +89,12 @@ impl<RW: ReadWrite> BufReader<RW> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn with_capacity(capacity: usize, inner: RW) -> BufReader<RW> {
+    pub fn with_capacity(capacity: usize, inner: RW) -> Self {
         unsafe {
             let mut buffer = Vec::with_capacity(capacity);
             buffer.set_len(capacity);
             inner.initializer().initialize(&mut buffer);
-            BufReader { inner, reader_buf: buffer.into_boxed_slice(), pos: 0, cap: 0 }
+            Self { inner, reader_buf: buffer.into_boxed_slice(), pos: 0, cap: 0 }
         }
     }
 }
