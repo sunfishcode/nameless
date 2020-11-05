@@ -45,7 +45,6 @@ use linewritershim::LineWriterShim;
 /// };
 /// ```
 #[derive(Debug)]
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct IntoInnerError<W>(W, Error);
 
 impl<W> IntoInnerError<W> {
@@ -90,7 +89,6 @@ impl<W> IntoInnerError<W> {
     ///     }
     /// };
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn error(&self) -> &Error {
         &self.1
     }
@@ -125,20 +123,17 @@ impl<W> IntoInnerError<W> {
     ///     }
     /// };
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn into_inner(self) -> W {
         self.0
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<W> From<IntoInnerError<W>> for Error {
     fn from(iie: IntoInnerError<W>) -> Error {
         iie.1
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<W: Send + fmt::Debug> error::Error for IntoInnerError<W> {
     #[allow(deprecated, deprecated_in_future)]
     fn description(&self) -> &str {
@@ -146,7 +141,6 @@ impl<W: Send + fmt::Debug> error::Error for IntoInnerError<W> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<W> fmt::Display for IntoInnerError<W> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.error().fmt(f)

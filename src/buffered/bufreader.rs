@@ -44,7 +44,6 @@ use crate::io::{self, BufRead, Initializer, IoSliceMut, Read, Seek, SeekFrom, DE
 ///     Ok(())
 /// }
 /// ```
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct BufReader<R> {
     inner: R,
     buf: Box<[u8]>,
@@ -68,7 +67,6 @@ impl<R: Read> BufReader<R> {
     ///     Ok(())
     /// }
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn new(inner: R) -> BufReader<R> {
         BufReader::with_capacity(DEFAULT_BUF_SIZE, inner)
     }
@@ -89,7 +87,6 @@ impl<R: Read> BufReader<R> {
     ///     Ok(())
     /// }
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn with_capacity(capacity: usize, inner: R) -> BufReader<R> {
         unsafe {
             let mut buffer = Vec::with_capacity(capacity);
@@ -119,7 +116,6 @@ impl<R> BufReader<R> {
     ///     Ok(())
     /// }
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn get_ref(&self) -> &R {
         &self.inner
     }
@@ -142,7 +138,6 @@ impl<R> BufReader<R> {
     ///     Ok(())
     /// }
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn get_mut(&mut self) -> &mut R {
         &mut self.inner
     }
@@ -170,7 +165,6 @@ impl<R> BufReader<R> {
     ///     Ok(())
     /// }
     /// ```
-    #[stable(feature = "bufreader_buffer", since = "1.37.0")]
     pub fn buffer(&self) -> &[u8] {
         &self.buf[self.pos..self.cap]
     }
@@ -193,7 +187,6 @@ impl<R> BufReader<R> {
     ///     Ok(())
     /// }
     /// ```
-    #[stable(feature = "buffered_io_capacity", since = "1.46.0")]
     pub fn capacity(&self) -> usize {
         self.buf.len()
     }
@@ -217,7 +210,6 @@ impl<R> BufReader<R> {
     ///     Ok(())
     /// }
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn into_inner(self) -> R {
         self.inner
     }
@@ -255,7 +247,6 @@ impl<R: Seek> BufReader<R> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<R: Read> Read for BufReader<R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         // If we don't have any buffered data and we're doing a massive read
@@ -297,7 +288,6 @@ impl<R: Read> Read for BufReader<R> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<R: Read> BufRead for BufReader<R> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         // If we've reached the end of our internal buffer then we need to fetch
@@ -317,7 +307,6 @@ impl<R: Read> BufRead for BufReader<R> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<R> fmt::Debug for BufReader<R>
 where
     R: fmt::Debug,
@@ -330,7 +319,6 @@ where
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<R: Seek> Seek for BufReader<R> {
     /// Seek to an offset, in bytes, in the underlying reader.
     ///

@@ -66,7 +66,6 @@ use crate::io::{self, buffered::LineWriterShim, BufWriter, IntoInnerError, IoSli
 ///     Ok(())
 /// }
 /// ```
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct LineWriter<W: Write> {
     inner: BufWriter<W>,
 }
@@ -86,7 +85,6 @@ impl<W: Write> LineWriter<W> {
     ///     Ok(())
     /// }
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn new(inner: W) -> LineWriter<W> {
         // Lines typically aren't that long, don't use a giant buffer
         LineWriter::with_capacity(1024, inner)
@@ -107,7 +105,6 @@ impl<W: Write> LineWriter<W> {
     ///     Ok(())
     /// }
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn with_capacity(capacity: usize, inner: W) -> LineWriter<W> {
         LineWriter { inner: BufWriter::with_capacity(capacity, inner) }
     }
@@ -128,7 +125,6 @@ impl<W: Write> LineWriter<W> {
     ///     Ok(())
     /// }
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn get_ref(&self) -> &W {
         self.inner.get_ref()
     }
@@ -153,7 +149,6 @@ impl<W: Write> LineWriter<W> {
     ///     Ok(())
     /// }
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn get_mut(&mut self) -> &mut W {
         self.inner.get_mut()
     }
@@ -181,13 +176,11 @@ impl<W: Write> LineWriter<W> {
     ///     Ok(())
     /// }
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn into_inner(self) -> Result<W, IntoInnerError<LineWriter<W>>> {
         self.inner.into_inner().map_err(|err| err.new_wrapped(|inner| LineWriter { inner }))
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<W: Write> Write for LineWriter<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         LineWriterShim::new(&mut self.inner).write(buf)
@@ -218,7 +211,6 @@ impl<W: Write> Write for LineWriter<W> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<W: Write> fmt::Debug for LineWriter<W>
 where
     W: fmt::Debug,

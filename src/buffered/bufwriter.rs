@@ -65,7 +65,6 @@ use crate::io::{
 /// [`TcpStream::write`]: Write::write
 /// [`TcpStream`]: crate::net::TcpStream
 /// [`flush`]: Write::flush
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct BufWriter<W: Write> {
     inner: Option<W>,
     buf: Vec<u8>,
@@ -87,7 +86,6 @@ impl<W: Write> BufWriter<W> {
     ///
     /// let mut buffer = BufWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn new(inner: W) -> BufWriter<W> {
         BufWriter::with_capacity(DEFAULT_BUF_SIZE, inner)
     }
@@ -105,7 +103,6 @@ impl<W: Write> BufWriter<W> {
     /// let stream = TcpStream::connect("127.0.0.1:34254").unwrap();
     /// let mut buffer = BufWriter::with_capacity(100, stream);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn with_capacity(capacity: usize, inner: W) -> BufWriter<W> {
         BufWriter { inner: Some(inner), buf: Vec::with_capacity(capacity), panicked: false }
     }
@@ -200,7 +197,6 @@ impl<W: Write> BufWriter<W> {
     /// // we can use reference just like buffer
     /// let reference = buffer.get_ref();
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn get_ref(&self) -> &W {
         self.inner.as_ref().unwrap()
     }
@@ -220,7 +216,6 @@ impl<W: Write> BufWriter<W> {
     /// // we can use reference just like buffer
     /// let reference = buffer.get_mut();
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn get_mut(&mut self) -> &mut W {
         self.inner.as_mut().unwrap()
     }
@@ -238,7 +233,6 @@ impl<W: Write> BufWriter<W> {
     /// // See how many bytes are currently buffered
     /// let bytes_buffered = buf_writer.buffer().len();
     /// ```
-    #[stable(feature = "bufreader_buffer", since = "1.37.0")]
     pub fn buffer(&self) -> &[u8] {
         &self.buf
     }
@@ -258,7 +252,6 @@ impl<W: Write> BufWriter<W> {
     /// // Calculate how many bytes can be written without flushing
     /// let without_flush = capacity - buf_writer.buffer().len();
     /// ```
-    #[stable(feature = "buffered_io_capacity", since = "1.46.0")]
     pub fn capacity(&self) -> usize {
         self.buf.capacity()
     }
@@ -282,7 +275,6 @@ impl<W: Write> BufWriter<W> {
     /// // unwrap the TcpStream and flush the buffer
     /// let stream = buffer.into_inner().unwrap();
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn into_inner(mut self) -> Result<W, IntoInnerError<BufWriter<W>>> {
         match self.flush_buf() {
             Err(e) => Err(IntoInnerError::new(self, e)),
@@ -291,7 +283,6 @@ impl<W: Write> BufWriter<W> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<W: Write> Write for BufWriter<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if self.buf.len() + buf.len() > self.buf.capacity() {
@@ -355,7 +346,6 @@ impl<W: Write> Write for BufWriter<W> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<W: Write> fmt::Debug for BufWriter<W>
 where
     W: fmt::Debug,
@@ -368,7 +358,6 @@ where
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<W: Write + Seek> Seek for BufWriter<W> {
     /// Seek to the offset, in bytes, in the underlying writer.
     ///
@@ -379,7 +368,6 @@ impl<W: Write + Seek> Seek for BufWriter<W> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<W: Write> Drop for BufWriter<W> {
     fn drop(&mut self) {
         if self.inner.is_some() && !self.panicked {
