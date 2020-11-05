@@ -3,7 +3,7 @@
 
 use crate::fmt;
 use crate::io::{
-    self, Error, ErrorKind, IntoInnerError, IoSlice, Seek, SeekFrom, Write, DEFAULT_BUF_SIZE,
+    self, Error, ErrorKind, IntoInnerError, IoSlice, Write, DEFAULT_BUF_SIZE,
 };
 
 /// Wraps a writer and buffers its output.
@@ -355,16 +355,6 @@ where
             .field("writer", &self.inner.as_ref().unwrap())
             .field("buffer", &format_args!("{}/{}", self.buf.len(), self.buf.capacity()))
             .finish()
-    }
-}
-
-impl<W: Write + Seek> Seek for BufWriter<W> {
-    /// Seek to the offset, in bytes, in the underlying writer.
-    ///
-    /// Seeking always writes out the internal buffer before seeking.
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        self.flush_buf()?;
-        self.get_mut().seek(pos)
     }
 }
 
