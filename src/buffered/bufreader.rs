@@ -48,7 +48,7 @@ use crate::ReadWrite;
 /// ```
 pub struct BufReader<RW> {
     inner: RW,
-    buf: Box<[u8]>,
+    reader_buf: Box<[u8]>,
     pos: usize,
     cap: usize,
 }
@@ -94,7 +94,7 @@ impl<RW: ReadWrite> BufReader<RW> {
             let mut buffer = Vec::with_capacity(capacity);
             buffer.set_len(capacity);
             inner.initializer().initialize(&mut buffer);
-            BufReader { inner, buf: buffer.into_boxed_slice(), pos: 0, cap: 0 }
+            BufReader { inner, reader_buf: buffer.into_boxed_slice(), pos: 0, cap: 0 }
         }
     }
 }
@@ -168,7 +168,7 @@ impl<RW> BufReader<RW> {
     /// }
     /// ```
     pub fn buffer(&self) -> &[u8] {
-        &self.buf[self.pos..self.cap]
+        &self.reader_buf[self.pos..self.cap]
     }
 
     /// Returns the number of bytes the internal buffer can hold at once.
@@ -190,7 +190,7 @@ impl<RW> BufReader<RW> {
     /// }
     /// ```
     pub fn capacity(&self) -> usize {
-        self.buf.len()
+        self.reader_buf.len()
     }
 
     /// Unwraps this `BufReader<RW>`, returning the underlying reader.
@@ -229,7 +229,7 @@ impl<RW: ReadWrite> Read for BufReader<RW> {
         // If we don't have any buffered data and we're doing a massive read
         // (larger than our internal buffer), bypass our internal buffer
         // entirely.
-        if self.pos == self.cap && buf.len() >= self.buf.len() {
+        if self.pos == self.cap && buf.len() >= self.reader_buf.len() {
             self.discard_buffer();
             return self.inner.read(buf);
         }
@@ -243,7 +243,7 @@ impl<RW: ReadWrite> Read for BufReader<RW> {
 
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let total_len = bufs.iter().map(|b| b.len()).sum::<usize>();
-        if self.pos == self.cap && total_len >= self.buf.len() {
+        if self.pos == self.cap && total_len >= self.reader_buf.len() {
             self.discard_buffer();
             return self.inner.read_vectored(bufs);
         }
@@ -273,10 +273,10 @@ impl<RW: ReadWrite> BufRead for BufReader<RW> {
         // to tell the compiler that the pos..cap slice is always valid.
         if self.pos >= self.cap {
             debug_assert!(self.pos == self.cap);
-            self.cap = self.inner.read(&mut self.buf)?;
+            self.cap = self.inner.read(&mut self.reader_buf)?;
             self.pos = 0;
         }
-        Ok(&self.buf[self.pos..self.cap])
+        Ok(&self.reader_buf[self.pos..self.cap])
     }
 
     fn consume(&mut self, amt: usize) {
@@ -291,7 +291,7 @@ where
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("BufReader")
             .field("reader", &self.inner)
-            .field("buffer", &format_args!("{}/{}", self.cap - self.pos, self.buf.len()))
+            .field("buffer", &format_args!("{}/{}", self.cap - self.pos, self.reader_buf.len()))
             .finish()
     }
 }

@@ -69,7 +69,7 @@ use crate::ReadWrite;
 /// [`flush`]: Write::flush
 pub struct BufWriter<RW: ReadWrite> {
     inner: Option<RW>,
-    buf: Vec<u8>,
+    writer_buf: Vec<u8>,
     // #30888: If the inner writer panics in a call to write, we don't want to
     // write the buffered data a second time in BufWriter's destructor. This
     // flag tells the Drop impl if it should skip the flush.
@@ -106,7 +106,7 @@ impl<RW: ReadWrite> BufWriter<RW> {
     /// let mut buffer = BufWriter::with_capacity(100, stream);
     /// ```
     pub fn with_capacity(capacity: usize, inner: RW) -> BufWriter<RW> {
-        BufWriter { inner: Some(inner), buf: Vec::with_capacity(capacity), panicked: false }
+        BufWriter { inner: Some(inner), writer_buf: Vec::with_capacity(capacity), panicked: false }
     }
 
     /// Send data in our local buffer into the inner writer, looping as
@@ -154,7 +154,7 @@ impl<RW: ReadWrite> BufWriter<RW> {
             }
         }
 
-        let mut guard = BufGuard::new(&mut self.buf);
+        let mut guard = BufGuard::new(&mut self.writer_buf);
         let inner = self.inner.as_mut().unwrap();
         while !guard.done() {
             self.panicked = true;
@@ -180,9 +180,9 @@ impl<RW: ReadWrite> BufWriter<RW> {
     /// data. Writes as much as possible without exceeding capacity. Returns
     /// the number of bytes written.
     pub(super) fn write_to_buf(&mut self, buf: &[u8]) -> usize {
-        let available = self.buf.capacity() - self.buf.len();
+        let available = self.writer_buf.capacity() - self.writer_buf.len();
         let amt_to_buffer = available.min(buf.len());
-        self.buf.extend_from_slice(&buf[..amt_to_buffer]);
+        self.writer_buf.extend_from_slice(&buf[..amt_to_buffer]);
         amt_to_buffer
     }
 
@@ -236,7 +236,7 @@ impl<RW: ReadWrite> BufWriter<RW> {
     /// let bytes_buffered = buf_writer.buffer().len();
     /// ```
     pub fn buffer(&self) -> &[u8] {
-        &self.buf
+        &self.writer_buf
     }
 
     /// Returns the number of bytes the internal buffer can hold without flushing.
@@ -255,7 +255,7 @@ impl<RW: ReadWrite> BufWriter<RW> {
     /// let without_flush = capacity - buf_writer.buffer().len();
     /// ```
     pub fn capacity(&self) -> usize {
-        self.buf.capacity()
+        self.writer_buf.capacity()
     }
 
     /// Unwraps this `BufWriter<RW>`, returning the underlying writer.
@@ -287,17 +287,17 @@ impl<RW: ReadWrite> BufWriter<RW> {
 
 impl<RW: ReadWrite> Write for BufWriter<RW> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if self.buf.len() + buf.len() > self.buf.capacity() {
+        if self.writer_buf.len() + buf.len() > self.writer_buf.capacity() {
             self.flush_buf()?;
         }
         // FIXME: Why no len > capacity? Why not buffer len == capacity? #72919
-        if buf.len() >= self.buf.capacity() {
+        if buf.len() >= self.writer_buf.capacity() {
             self.panicked = true;
             let r = self.get_mut().write(buf);
             self.panicked = false;
             r
         } else {
-            self.buf.extend_from_slice(buf);
+            self.writer_buf.extend_from_slice(buf);
             Ok(buf.len())
         }
     }
@@ -307,34 +307,34 @@ impl<RW: ReadWrite> Write for BufWriter<RW> {
         // by calling `self.get_mut().write_all()` directly, which avoids
         // round trips through the buffer in the event of a series of partial
         // writes in some circumstances.
-        if self.buf.len() + buf.len() > self.buf.capacity() {
+        if self.writer_buf.len() + buf.len() > self.writer_buf.capacity() {
             self.flush_buf()?;
         }
         // FIXME: Why no len > capacity? Why not buffer len == capacity? #72919
-        if buf.len() >= self.buf.capacity() {
+        if buf.len() >= self.writer_buf.capacity() {
             self.panicked = true;
             let r = self.get_mut().write_all(buf);
             self.panicked = false;
             r
         } else {
-            self.buf.extend_from_slice(buf);
+            self.writer_buf.extend_from_slice(buf);
             Ok(())
         }
     }
 
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         let total_len = bufs.iter().map(|b| b.len()).sum::<usize>();
-        if self.buf.len() + total_len > self.buf.capacity() {
+        if self.writer_buf.len() + total_len > self.writer_buf.capacity() {
             self.flush_buf()?;
         }
         // FIXME: Why no len > capacity? Why not buffer len == capacity? #72919
-        if total_len >= self.buf.capacity() {
+        if total_len >= self.writer_buf.capacity() {
             self.panicked = true;
             let r = self.get_mut().write_vectored(bufs);
             self.panicked = false;
             r
         } else {
-            bufs.iter().for_each(|b| self.buf.extend_from_slice(b));
+            bufs.iter().for_each(|b| self.writer_buf.extend_from_slice(b));
             Ok(total_len)
         }
     }
@@ -355,7 +355,7 @@ where
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("BufWriter")
             .field("writer", &self.inner.as_ref().unwrap())
-            .field("buffer", &format_args!("{}/{}", self.buf.len(), self.buf.capacity()))
+            .field("buffer", &format_args!("{}/{}", self.writer_buf.len(), self.writer_buf.capacity()))
             .finish()
     }
 }
