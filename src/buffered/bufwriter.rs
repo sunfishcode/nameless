@@ -354,8 +354,8 @@ where
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("BufWriter")
-            .field("writer", &self.inner.as_ref().unwrap())
-            .field("buffer", &format_args!("{}/{}", self.writer_buf.len(), self.writer_buf.capacity()))
+            .field("inner", &self.inner.as_ref().unwrap())
+            .field("writer_buffer", &format_args!("{}/{}", self.writer_buf.len(), self.writer_buf.capacity()))
             .finish()
     }
 }

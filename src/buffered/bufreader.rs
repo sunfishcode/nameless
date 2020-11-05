@@ -290,8 +290,8 @@ where
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("BufReader")
-            .field("reader", &self.inner)
-            .field("buffer", &format_args!("{}/{}", self.cap - self.pos, self.reader_buf.len()))
+            .field("inner", &self.inner)
+            .field("reader_buffer", &format_args!("{}/{}", self.cap - self.pos, self.reader_buf.len()))
             .finish()
     }
 }

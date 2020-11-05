@@ -219,9 +219,9 @@ where
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("LineWriter")
-            .field("writer", &self.get_ref())
+            .field("inner", &self.get_ref())
             .field(
-                "buffer",
+                "writer_buffer",
                 &format_args!("{}/{}", self.inner.buffer().len(), self.inner.capacity()),
             )
             .finish()
