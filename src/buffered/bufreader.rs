@@ -1,3 +1,6 @@
+//! This file is derived from Rust's library/std/src/io/buffered at revision
+//! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
+
 use crate::cmp;
 use crate::fmt;
 use crate::io::{self, BufRead, Initializer, IoSliceMut, Read, Seek, SeekFrom, DEFAULT_BUF_SIZE};

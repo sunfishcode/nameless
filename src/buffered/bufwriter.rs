@@ -1,3 +1,6 @@
+//! This file is derived from Rust's library/std/src/io/buffered at revision
+//! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
+
 use crate::fmt;
 use crate::io::{
     self, Error, ErrorKind, IntoInnerError, IoSlice, Seek, SeekFrom, Write, DEFAULT_BUF_SIZE,
