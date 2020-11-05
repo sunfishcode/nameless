@@ -1,8 +1,9 @@
 //! This file is derived from Rust's library/std/src/io/buffered at revision
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
-use crate::fmt;
-use crate::io::{self, buffered::LineWriterShim, BufWriter, IntoInnerError, IoSlice, Write};
+use std::fmt;
+use std::io::{self, IoSlice, Write};
+use super::{BufWriter, IntoInnerError, LineWriterShim};
 
 /// Wraps a writer and buffers output to it, flushing whenever a newline
 /// (`0x0a`, `'\n'`) is detected.

@@ -1,10 +1,11 @@
 //! This file is derived from Rust's library/std/src/io/buffered at revision
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
-use crate::fmt;
-use crate::io::{
-    self, Error, ErrorKind, IntoInnerError, IoSlice, Write, DEFAULT_BUF_SIZE,
+use std::fmt;
+use std::io::{
+    self, Error, ErrorKind, IoSlice, Write,
 };
+use super::{DEFAULT_BUF_SIZE, IntoInnerError};
 
 /// Wraps a writer and buffers its output.
 ///
@@ -63,7 +64,7 @@ use crate::io::{
 /// the `stream` is flushed.
 ///
 /// [`TcpStream::write`]: Write::write
-/// [`TcpStream`]: crate::net::TcpStream
+/// [`TcpStream`]: std::net::TcpStream
 /// [`flush`]: Write::flush
 pub struct BufWriter<W: Write> {
     inner: Option<W>,

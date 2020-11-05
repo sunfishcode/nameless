@@ -1,8 +1,8 @@
 //! This file is derived from Rust's library/std/src/io/buffered at revision
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
-use crate::io::{self, BufWriter, IoSlice, Write};
-use crate::memchr;
+use std::io::{self, IoSlice, Write};
+use super::BufWriter;
 
 /// Private helper struct for implementing the line-buffered writing logic.
 /// This shim temporarily wraps a BufWriter, and uses its internals to

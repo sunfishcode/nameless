@@ -1,11 +1,12 @@
 //! This file is derived from Rust's library/std/src/io/buffered at revision
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
-use crate::io::prelude::*;
-use crate::io::{self, BufReader, BufWriter, ErrorKind, IoSlice, LineWriter};
-use crate::panic;
-use crate::sync::atomic::{AtomicUsize, Ordering};
-use crate::thread;
+use std::io::prelude::*;
+use std::io::{self, ErrorKind, IoSlice};
+use std::panic;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread;
+use super::{BufReader, BufWriter, LineWriter};
 
 /// A dummy reader intended at testing short-reads propagation.
 pub struct ShortReader {
@@ -398,7 +399,7 @@ fn line_vectored() {
 
 #[test]
 fn line_vectored_partial_and_errors() {
-    use crate::collections::VecDeque;
+    use std::collections::VecDeque;
 
     enum Call {
         Write { inputs: Vec<&'static [u8]>, output: io::Result<usize> },
@@ -731,7 +732,7 @@ struct WriteRecorder {
 
 impl Write for WriteRecorder {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        use crate::str::from_utf8;
+        use std::str::from_utf8;
 
         self.events.push(RecordedEvent::Write(from_utf8(buf).unwrap().to_string()));
         Ok(buf.len())

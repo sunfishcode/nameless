@@ -11,9 +11,9 @@ mod linewritershim;
 #[cfg(test)]
 mod tests;
 
-use crate::error;
-use crate::fmt;
-use crate::io::Error;
+use std::error;
+use std::fmt;
+use std::io::Error;
 
 pub use bufreader::BufReader;
 pub use bufwriter::BufWriter;

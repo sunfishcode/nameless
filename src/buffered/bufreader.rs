@@ -1,9 +1,10 @@
 //! This file is derived from Rust's library/std/src/io/buffered at revision
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
-use crate::cmp;
-use crate::fmt;
-use crate::io::{self, BufRead, Initializer, IoSliceMut, Read, DEFAULT_BUF_SIZE};
+use std::cmp;
+use std::fmt;
+use std::io::{self, BufRead, Initializer, IoSliceMut, Read};
+use super::DEFAULT_BUF_SIZE;
 
 /// The `BufReader<R>` struct adds buffering to any reader.
 ///
@@ -25,7 +26,7 @@ use crate::io::{self, BufRead, Initializer, IoSliceMut, Read, DEFAULT_BUF_SIZE};
 /// data loss.
 ///
 /// [`TcpStream::read`]: Read::read
-/// [`TcpStream`]: crate::net::TcpStream
+/// [`TcpStream`]: std::net::TcpStream
 ///
 /// # Examples
 ///
