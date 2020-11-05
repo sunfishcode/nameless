@@ -3,6 +3,7 @@
 
 use std::io::{self, IoSlice, Write};
 use super::BufWriter;
+use crate::ReadWrite;
 
 /// Private helper struct for implementing the line-buffered writing logic.
 /// This shim temporarily wraps a BufWriter, and uses its internals to
@@ -14,19 +15,19 @@ use super::BufWriter;
 /// `BufWriters` to be temporarily given line-buffering logic; this is what
 /// enables Stdout to be alternately in line-buffered or block-buffered mode.
 #[derive(Debug)]
-pub struct LineWriterShim<'a, W: Write> {
-    buffer: &'a mut BufWriter<W>,
+pub struct LineWriterShim<'a, RW: ReadWrite> {
+    buffer: &'a mut BufWriter<RW>,
 }
 
-impl<'a, W: Write> LineWriterShim<'a, W> {
-    pub fn new(buffer: &'a mut BufWriter<W>) -> Self {
+impl<'a, RW: ReadWrite> LineWriterShim<'a, RW> {
+    pub fn new(buffer: &'a mut BufWriter<RW>) -> Self {
         Self { buffer }
     }
 
     /// Get a mutable reference to the inner writer (that is, the writer
     /// wrapped by the BufWriter). Be careful with this writer, as writes to
     /// it will bypass the buffer.
-    fn inner_mut(&mut self) -> &mut W {
+    fn inner_mut(&mut self) -> &mut RW {
         self.buffer.get_mut()
     }
 
@@ -46,7 +47,7 @@ impl<'a, W: Write> LineWriterShim<'a, W> {
     }
 }
 
-impl<'a, W: Write> Write for LineWriterShim<'a, W> {
+impl<'a, RW: ReadWrite> Write for LineWriterShim<'a, RW> {
     /// Write some data into this BufReader with line buffering. This means
     /// that, if any newlines are present in the data, the data up to the last
     /// newline is sent directly to the underlying writer, and data after it

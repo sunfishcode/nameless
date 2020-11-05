@@ -6,22 +6,23 @@ use std::io::{
     self, Error, ErrorKind, IoSlice, Write,
 };
 use super::{DEFAULT_BUF_SIZE, IntoInnerError};
+use crate::ReadWrite;
 
 /// Wraps a writer and buffers its output.
 ///
 /// It can be excessively inefficient to work directly with something that
 /// implements [`Write`]. For example, every call to
 /// [`write`][`TcpStream::write`] on [`TcpStream`] results in a system call. A
-/// `BufWriter<W>` keeps an in-memory buffer of data and writes it to an underlying
+/// `BufWriter<RW>` keeps an in-memory buffer of data and writes it to an underlying
 /// writer in large, infrequent batches.
 ///
-/// `BufWriter<W>` can improve the speed of programs that make *small* and
+/// `BufWriter<RW>` can improve the speed of programs that make *small* and
 /// *repeated* write calls to the same file or network socket. It does not
 /// help when writing very large amounts at once, or writing just one or a few
 /// times. It also provides no advantage when writing to a destination that is
 /// in memory, like a [`Vec`]`<u8>`.
 ///
-/// It is critical to call [`flush`] before `BufWriter<W>` is dropped. Though
+/// It is critical to call [`flush`] before `BufWriter<RW>` is dropped. Though
 /// dropping will attempt to flush the contents of the buffer, any errors
 /// that happen in the process of dropping will be ignored. Calling [`flush`]
 /// ensures that the buffer is empty and thus dropping will not even attempt
@@ -44,7 +45,7 @@ use super::{DEFAULT_BUF_SIZE, IntoInnerError};
 ///
 /// Because we're not buffering, we write each one in turn, incurring the
 /// overhead of a system call per byte written. We can fix this with a
-/// `BufWriter<W>`:
+/// `BufWriter<RW>`:
 ///
 /// ```no_run
 /// use std::io::prelude::*;
@@ -59,15 +60,15 @@ use super::{DEFAULT_BUF_SIZE, IntoInnerError};
 /// stream.flush().unwrap();
 /// ```
 ///
-/// By wrapping the stream with a `BufWriter<W>`, these ten writes are all grouped
+/// By wrapping the stream with a `BufWriter<RW>`, these ten writes are all grouped
 /// together by the buffer and will all be written out in one system call when
 /// the `stream` is flushed.
 ///
 /// [`TcpStream::write`]: Write::write
 /// [`TcpStream`]: std::net::TcpStream
 /// [`flush`]: Write::flush
-pub struct BufWriter<W: Write> {
-    inner: Option<W>,
+pub struct BufWriter<RW: ReadWrite> {
+    inner: Option<RW>,
     buf: Vec<u8>,
     // #30888: If the inner writer panics in a call to write, we don't want to
     // write the buffered data a second time in BufWriter's destructor. This
@@ -75,8 +76,8 @@ pub struct BufWriter<W: Write> {
     panicked: bool,
 }
 
-impl<W: Write> BufWriter<W> {
-    /// Creates a new `BufWriter<W>` with a default buffer capacity. The default is currently 8 KB,
+impl<RW: ReadWrite> BufWriter<RW> {
+    /// Creates a new `BufWriter<RW>` with a default buffer capacity. The default is currently 8 KB,
     /// but may change in the future.
     ///
     /// # Examples
@@ -87,11 +88,11 @@ impl<W: Write> BufWriter<W> {
     ///
     /// let mut buffer = BufWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     /// ```
-    pub fn new(inner: W) -> BufWriter<W> {
+    pub fn new(inner: RW) -> BufWriter<RW> {
         BufWriter::with_capacity(DEFAULT_BUF_SIZE, inner)
     }
 
-    /// Creates a new `BufWriter<W>` with the specified buffer capacity.
+    /// Creates a new `BufWriter<RW>` with the specified buffer capacity.
     ///
     /// # Examples
     ///
@@ -104,7 +105,7 @@ impl<W: Write> BufWriter<W> {
     /// let stream = TcpStream::connect("127.0.0.1:34254").unwrap();
     /// let mut buffer = BufWriter::with_capacity(100, stream);
     /// ```
-    pub fn with_capacity(capacity: usize, inner: W) -> BufWriter<W> {
+    pub fn with_capacity(capacity: usize, inner: RW) -> BufWriter<RW> {
         BufWriter { inner: Some(inner), buf: Vec::with_capacity(capacity), panicked: false }
     }
 
@@ -198,7 +199,7 @@ impl<W: Write> BufWriter<W> {
     /// // we can use reference just like buffer
     /// let reference = buffer.get_ref();
     /// ```
-    pub fn get_ref(&self) -> &W {
+    pub fn get_ref(&self) -> &RW {
         self.inner.as_ref().unwrap()
     }
 
@@ -217,7 +218,7 @@ impl<W: Write> BufWriter<W> {
     /// // we can use reference just like buffer
     /// let reference = buffer.get_mut();
     /// ```
-    pub fn get_mut(&mut self) -> &mut W {
+    pub fn get_mut(&mut self) -> &mut RW {
         self.inner.as_mut().unwrap()
     }
 
@@ -257,7 +258,7 @@ impl<W: Write> BufWriter<W> {
         self.buf.capacity()
     }
 
-    /// Unwraps this `BufWriter<W>`, returning the underlying writer.
+    /// Unwraps this `BufWriter<RW>`, returning the underlying writer.
     ///
     /// The buffer is written out before returning the writer.
     ///
@@ -276,7 +277,7 @@ impl<W: Write> BufWriter<W> {
     /// // unwrap the TcpStream and flush the buffer
     /// let stream = buffer.into_inner().unwrap();
     /// ```
-    pub fn into_inner(mut self) -> Result<W, IntoInnerError<BufWriter<W>>> {
+    pub fn into_inner(mut self) -> Result<RW, IntoInnerError<BufWriter<RW>>> {
         match self.flush_buf() {
             Err(e) => Err(IntoInnerError::new(self, e)),
             Ok(()) => Ok(self.inner.take().unwrap()),
@@ -284,7 +285,7 @@ impl<W: Write> BufWriter<W> {
     }
 }
 
-impl<W: Write> Write for BufWriter<W> {
+impl<RW: ReadWrite> Write for BufWriter<RW> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if self.buf.len() + buf.len() > self.buf.capacity() {
             self.flush_buf()?;
@@ -347,9 +348,9 @@ impl<W: Write> Write for BufWriter<W> {
     }
 }
 
-impl<W: Write> fmt::Debug for BufWriter<W>
+impl<RW: ReadWrite> fmt::Debug for BufWriter<RW>
 where
-    W: fmt::Debug,
+    RW: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("BufWriter")
@@ -359,7 +360,7 @@ where
     }
 }
 
-impl<W: Write> Drop for BufWriter<W> {
+impl<RW: ReadWrite> Drop for BufWriter<RW> {
     fn drop(&mut self) {
         if self.inner.is_some() && !self.panicked {
             // dtors should not panic, so we ignore a failed flush

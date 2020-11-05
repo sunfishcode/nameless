@@ -5,24 +5,25 @@ use std::cmp;
 use std::fmt;
 use std::io::{self, BufRead, Initializer, IoSliceMut, Read};
 use super::DEFAULT_BUF_SIZE;
+use crate::ReadWrite;
 
-/// The `BufReader<R>` struct adds buffering to any reader.
+/// The `BufReader<RW>` struct adds buffering to any reader.
 ///
 /// It can be excessively inefficient to work directly with a [`Read`] instance.
 /// For example, every call to [`read`][`TcpStream::read`] on [`TcpStream`]
-/// results in a system call. A `BufReader<R>` performs large, infrequent reads on
+/// results in a system call. A `BufReader<RW>` performs large, infrequent reads on
 /// the underlying [`Read`] and maintains an in-memory buffer of the results.
 ///
-/// `BufReader<R>` can improve the speed of programs that make *small* and
+/// `BufReader<RW>` can improve the speed of programs that make *small* and
 /// *repeated* read calls to the same file or network socket. It does not
 /// help when reading very large amounts at once, or reading just one or a few
 /// times. It also provides no advantage when reading from a source that is
 /// already in memory, like a [`Vec`]`<u8>`.
 ///
-/// When the `BufReader<R>` is dropped, the contents of its buffer will be
-/// discarded. Creating multiple instances of a `BufReader<R>` on the same
+/// When the `BufReader<RW>` is dropped, the contents of its buffer will be
+/// discarded. Creating multiple instances of a `BufReader<RW>` on the same
 /// stream can cause data loss. Reading from the underlying reader after
-/// unwrapping the `BufReader<R>` with [`BufReader::into_inner`] can also cause
+/// unwrapping the `BufReader<RW>` with [`BufReader::into_inner`] can also cause
 /// data loss.
 ///
 /// [`TcpStream::read`]: Read::read
@@ -45,15 +46,15 @@ use super::DEFAULT_BUF_SIZE;
 ///     Ok(())
 /// }
 /// ```
-pub struct BufReader<R> {
-    inner: R,
+pub struct BufReader<RW> {
+    inner: RW,
     buf: Box<[u8]>,
     pos: usize,
     cap: usize,
 }
 
-impl<R: Read> BufReader<R> {
-    /// Creates a new `BufReader<R>` with a default buffer capacity. The default is currently 8 KB,
+impl<RW: ReadWrite> BufReader<RW> {
+    /// Creates a new `BufReader<RW>` with a default buffer capacity. The default is currently 8 KB,
     /// but may change in the future.
     ///
     /// # Examples
@@ -68,11 +69,11 @@ impl<R: Read> BufReader<R> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn new(inner: R) -> BufReader<R> {
+    pub fn new(inner: RW) -> BufReader<RW> {
         BufReader::with_capacity(DEFAULT_BUF_SIZE, inner)
     }
 
-    /// Creates a new `BufReader<R>` with the specified buffer capacity.
+    /// Creates a new `BufReader<RW>` with the specified buffer capacity.
     ///
     /// # Examples
     ///
@@ -88,7 +89,7 @@ impl<R: Read> BufReader<R> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn with_capacity(capacity: usize, inner: R) -> BufReader<R> {
+    pub fn with_capacity(capacity: usize, inner: RW) -> BufReader<RW> {
         unsafe {
             let mut buffer = Vec::with_capacity(capacity);
             buffer.set_len(capacity);
@@ -98,7 +99,7 @@ impl<R: Read> BufReader<R> {
     }
 }
 
-impl<R> BufReader<R> {
+impl<RW> BufReader<RW> {
     /// Gets a reference to the underlying reader.
     ///
     /// It is inadvisable to directly read from the underlying reader.
@@ -117,7 +118,7 @@ impl<R> BufReader<R> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn get_ref(&self) -> &R {
+    pub fn get_ref(&self) -> &RW {
         &self.inner
     }
 
@@ -139,7 +140,7 @@ impl<R> BufReader<R> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn get_mut(&mut self) -> &mut R {
+    pub fn get_mut(&mut self) -> &mut RW {
         &mut self.inner
     }
 
@@ -192,7 +193,7 @@ impl<R> BufReader<R> {
         self.buf.len()
     }
 
-    /// Unwraps this `BufReader<R>`, returning the underlying reader.
+    /// Unwraps this `BufReader<RW>`, returning the underlying reader.
     ///
     /// Note that any leftover data in the internal buffer is lost. Therefore,
     /// a following read from the underlying reader may lead to data loss.
@@ -211,7 +212,7 @@ impl<R> BufReader<R> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn into_inner(self) -> R {
+    pub fn into_inner(self) -> RW {
         self.inner
     }
 
@@ -223,7 +224,7 @@ impl<R> BufReader<R> {
     }
 }
 
-impl<R: Read> Read for BufReader<R> {
+impl<RW: ReadWrite> Read for BufReader<RW> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         // If we don't have any buffered data and we're doing a massive read
         // (larger than our internal buffer), bypass our internal buffer
@@ -264,7 +265,7 @@ impl<R: Read> Read for BufReader<R> {
     }
 }
 
-impl<R: Read> BufRead for BufReader<R> {
+impl<RW: ReadWrite> BufRead for BufReader<RW> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         // If we've reached the end of our internal buffer then we need to fetch
         // some more data from the underlying reader.
@@ -283,9 +284,9 @@ impl<R: Read> BufRead for BufReader<R> {
     }
 }
 
-impl<R> fmt::Debug for BufReader<R>
+impl<RW> fmt::Debug for BufReader<RW>
 where
-    R: fmt::Debug,
+    RW: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("BufReader")

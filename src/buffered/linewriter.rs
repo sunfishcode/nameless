@@ -4,6 +4,7 @@
 use std::fmt;
 use std::io::{self, IoSlice, Write};
 use super::{BufWriter, IntoInnerError, LineWriterShim};
+use crate::ReadWrite;
 
 /// Wraps a writer and buffers output to it, flushing whenever a newline
 /// (`0x0a`, `'\n'`) is detected.
@@ -67,11 +68,11 @@ use super::{BufWriter, IntoInnerError, LineWriterShim};
 ///     Ok(())
 /// }
 /// ```
-pub struct LineWriter<W: Write> {
-    inner: BufWriter<W>,
+pub struct LineWriter<RW: ReadWrite> {
+    inner: BufWriter<RW>,
 }
 
-impl<W: Write> LineWriter<W> {
+impl<RW: ReadWrite> LineWriter<RW> {
     /// Creates a new `LineWriter`.
     ///
     /// # Examples
@@ -86,7 +87,7 @@ impl<W: Write> LineWriter<W> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn new(inner: W) -> LineWriter<W> {
+    pub fn new(inner: RW) -> LineWriter<RW> {
         // Lines typically aren't that long, don't use a giant buffer
         LineWriter::with_capacity(1024, inner)
     }
@@ -106,7 +107,7 @@ impl<W: Write> LineWriter<W> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn with_capacity(capacity: usize, inner: W) -> LineWriter<W> {
+    pub fn with_capacity(capacity: usize, inner: RW) -> LineWriter<RW> {
         LineWriter { inner: BufWriter::with_capacity(capacity, inner) }
     }
 
@@ -126,7 +127,7 @@ impl<W: Write> LineWriter<W> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn get_ref(&self) -> &W {
+    pub fn get_ref(&self) -> &RW {
         self.inner.get_ref()
     }
 
@@ -150,7 +151,7 @@ impl<W: Write> LineWriter<W> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn get_mut(&mut self) -> &mut W {
+    pub fn get_mut(&mut self) -> &mut RW {
         self.inner.get_mut()
     }
 
@@ -177,12 +178,12 @@ impl<W: Write> LineWriter<W> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn into_inner(self) -> Result<W, IntoInnerError<LineWriter<W>>> {
+    pub fn into_inner(self) -> Result<RW, IntoInnerError<LineWriter<RW>>> {
         self.inner.into_inner().map_err(|err| err.new_wrapped(|inner| LineWriter { inner }))
     }
 }
 
-impl<W: Write> Write for LineWriter<W> {
+impl<RW: ReadWrite> Write for LineWriter<RW> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         LineWriterShim::new(&mut self.inner).write(buf)
     }
@@ -212,9 +213,9 @@ impl<W: Write> Write for LineWriter<W> {
     }
 }
 
-impl<W: Write> fmt::Debug for LineWriter<W>
+impl<RW: ReadWrite> fmt::Debug for LineWriter<RW>
 where
-    W: fmt::Debug,
+    RW: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("LineWriter")
