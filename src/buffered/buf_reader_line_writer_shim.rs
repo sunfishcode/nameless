@@ -6,12 +6,12 @@ use super::BufReaderWriter;
 use crate::ReadWrite;
 
 /// Private helper struct for implementing the line-buffered writing logic.
-/// This shim temporarily wraps a BufReaderWriter, and uses its internals to
+/// This shim temporarily wraps a `BufReaderWriter`, and uses its internals to
 /// implement a line-buffered writer (specifically by using the internal
-/// methods like write_to_buf and flush_buf). In this way, a more
+/// methods like `write_to_buf` and `flush_buf`). In this way, a more
 /// efficient abstraction can be created than one that only had access to
 /// `write` and `flush`, without needlessly duplicating a lot of the
-/// implementation details of BufReaderWriter. This also allows existing
+/// implementation details of `BufReaderWriter`. This also allows existing
 /// `BufReaderWriter`s to be temporarily given line-buffering logic; this is what
 /// enables Stdout to be alternately in line-buffered or block-buffered mode.
 #[derive(Debug)]
@@ -26,7 +26,7 @@ impl<'a, RW: ReadWrite> BufReaderLineWriterShim<'a, RW> {
     }
 
     /// Get a mutable reference to the inner writer (that is, the writer
-    /// wrapped by the BufReaderWriter). Be careful with this writer, as writes to
+    /// wrapped by the `BufReaderWriter`). Be careful with this writer, as writes to
     /// it will bypass the buffer.
     #[inline]
     fn inner_mut(&mut self) -> &mut RW {
@@ -51,7 +51,7 @@ impl<'a, RW: ReadWrite> BufReaderLineWriterShim<'a, RW> {
 }
 
 impl<'a, RW: ReadWrite> Write for BufReaderLineWriterShim<'a, RW> {
-    /// Write some data into this BufReaderLineWriterShim with line buffering. This means
+    /// Write some data into this `BufReaderLineWriterShim` with line buffering. This means
     /// that, if any newlines are present in the data, the data up to the last
     /// newline is sent directly to the underlying writer, and data after it
     /// is buffered. Returns the number of bytes written.
@@ -91,7 +91,7 @@ impl<'a, RW: ReadWrite> Write for BufReaderLineWriterShim<'a, RW> {
 
         // Write `lines` directly to the inner writer. In keeping with the
         // `write` convention, make at most one attempt to add new (unbuffered)
-        // data. Because this write doesn't touch the BufReaderWriter state directly,
+        // data. Because this write doesn't touch the `BufReaderWriter` state directly,
         // and the buffer is known to be empty, we don't need to worry about
         // self.buffer.panicked here.
         let flushed = self.inner_mut().write(lines)?;
@@ -138,7 +138,7 @@ impl<'a, RW: ReadWrite> Write for BufReaderLineWriterShim<'a, RW> {
         self.buffer.flush()
     }
 
-    /// Write some vectored data into this BufReaderLineWriterShim with line buffering. This
+    /// Write some vectored data into this `BufReaderLineWriterShim` with line buffering. This
     /// means that, if any newlines are present in the data, the data up to
     /// and including the buffer containing the last newline is sent directly
     /// to the inner writer, and the data after it is buffered. Returns the
@@ -204,7 +204,7 @@ impl<'a, RW: ReadWrite> Write for BufReaderLineWriterShim<'a, RW> {
 
         // Write `lines` directly to the inner writer. In keeping with the
         // `write` convention, make at most one attempt to add new (unbuffered)
-        // data. Because this write doesn't touch the BufReaderWriter state directly,
+        // data. Because this write doesn't touch the `BufReaderWriter` state directly,
         // and the buffer is known to be empty, we don't need to worry about
         // self.panicked here.
         let flushed = self.inner_mut().write_vectored(lines)?;
@@ -241,7 +241,7 @@ impl<'a, RW: ReadWrite> Write for BufReaderLineWriterShim<'a, RW> {
         self.buffer.is_write_vectored()
     }
 
-    /// Write some data into this BufReaderLineWriterShim with line buffering. This means
+    /// Write some data into this `BufReaderLineWriterShim` with line buffering. This means
     /// that, if any newlines are present in the data, the data up to the last
     /// newline is sent directly to the underlying writer, and data after it
     /// is buffered.

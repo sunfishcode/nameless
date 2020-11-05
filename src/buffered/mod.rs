@@ -37,7 +37,7 @@ pub(super) const DEFAULT_BUF_SIZE: usize = 8 * 1024;
 /// let stream = match stream.into_inner() {
 ///     Ok(s) => s,
 ///     Err(e) => {
-///         // Here, e is an IntoInnerError
+///         // Here, e is an `IntoInnerError`
 ///         panic!("An error occurred");
 ///     }
 /// };
@@ -46,12 +46,12 @@ pub(super) const DEFAULT_BUF_SIZE: usize = 8 * 1024;
 pub struct IntoInnerError<W>(W, Error);
 
 impl<W> IntoInnerError<W> {
-    /// Construct a new IntoInnerError
+    /// Construct a new `IntoInnerError`
     fn new(writer: W, error: Error) -> Self {
         Self(writer, error)
     }
 
-    /// Helper to construct a new IntoInnerError; intended to help with
+    /// Helper to construct a new `IntoInnerError`; intended to help with`
     /// adapters that wrap other adapters
     fn new_wrapped<W2>(self, f: impl FnOnce(W) -> W2) -> IntoInnerError<W2> {
         let Self(writer, error) = self;
@@ -78,7 +78,7 @@ impl<W> IntoInnerError<W> {
     /// let stream = match stream.into_inner() {
     ///     Ok(s) => s,
     ///     Err(e) => {
-    ///         // Here, e is an IntoInnerError, let's log the inner error.
+    ///         // Here, e is an `IntoInnerError`, let's log the inner error.
     ///         //
     ///         // We'll just 'log' to stdout for this example.
     ///         println!("{}", e.error());
@@ -111,7 +111,7 @@ impl<W> IntoInnerError<W> {
     /// let stream = match stream.into_inner() {
     ///     Ok(s) => s,
     ///     Err(e) => {
-    ///         // Here, e is an IntoInnerError, let's re-examine the buffer:
+    ///         // Here, e is an `IntoInnerError`, let's re-examine the buffer:
     ///         let buffer = e.into_inner();
     ///
     ///         // do stuff to try to recover
