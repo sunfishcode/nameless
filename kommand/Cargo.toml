@@ -18,5 +18,9 @@ syn = { version = "1.0.5", features = ["full", "extra-traits"] }
 proc-macro2 = { version = "1.0.2", features = ["nightly"] }
 quote = "1.0.2"
 
+[dev-dependencies]
+paw = "1.0.0"
+structopt = { version = "0.3.20", features = ["paw"] }
+
 [badges]
 maintenance = { status = "actively-developed" }
