@@ -1,12 +1,14 @@
-//! Define `CommandStdinStdout`, an interactive stream object formed by
-//! combining a child process' stdin and stdout.
+//! Define `CommandStdinStdout`, a lazy form of `ChildStdinStdout` which
+//! launches the child process on demand. This works better with
+//! command-line parsers like `clap` which call `from_str` multiple times
+//! and expect to be able to harmlessly discard the results.
 
+use crate::child_stdin_stdout::ChildStdinStdout;
 use std::process::{Command, Stdio};
 use std::{
     fmt::Arguments,
     io::{self, IoSlice, IoSliceMut, Read, Write},
 };
-use crate::child_stdin_stdout::ChildStdinStdout;
 
 /// A child's (stdin, stdout) pair which can implement the `ReadWrite` trait.
 pub(crate) struct CommandStdinStdout {
@@ -18,7 +20,10 @@ impl CommandStdinStdout {
     pub(crate) fn new(mut command: Command) -> Self {
         command.stdin(Stdio::piped());
         command.stdout(Stdio::piped());
-        Self { command, child: None }
+        Self {
+            command,
+            child: None,
+        }
     }
 
     fn child(&mut self) -> io::Result<&mut ChildStdinStdout> {

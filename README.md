@@ -14,7 +14,8 @@
 
 Currently, `http:`, `https:`, `file:`, and `data:` URLs are supported. Plain
 filesystem paths are also accepted, files with names ending with ".gz" are
-decompressed on the fly, and "-" means stdin or stdout.
+decompressed on the fly, "-" means stdin or stdout, and "$(...)" means to run
+a child process and pipe to its stdin or stdout.
 
 ## Overview
 
@@ -38,8 +39,8 @@ This library provides:
 
 When using these features, boilerplate for converting command-line argument
 strings into open files is abstracted away, allowing this library to
-transparently provide more features such as recognizing URLs and gzip'd files,
-and "-" for stdin or stdout.
+transparently provide more features such as URLs, gzip'd files, stdin and
+stdout, and child processes.
 
 It also helps programs avoid accidentally having behavior that depends on
 the names of files it accesses, which is a common source of trouble in

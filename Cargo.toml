@@ -24,6 +24,9 @@ readwrite = { version = "0.1.2", optional = true }
 ureq = { version = "1.5.1", default-features = false, features = ["tls", "charset"] }
 url = "2.1.1"
 
+[target.'cfg(not(windows))'.dependencies]
+shell-words = "1.0.0"
+
 [dev-dependencies]
 humantime = "2.0.1"
 kommand = { path = "kommand" }

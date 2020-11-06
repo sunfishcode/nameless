@@ -1,4 +1,30 @@
 //! A simple REPL program using `kommand` and `InteractiveByteStream`.
+//!
+//! Run it interactively with the process' (stdin, stdout):
+//! ```
+//! $ cargo run --quiet --example repl -
+//! prompt> hello
+//! [entered "hello"]
+//! prompt> world
+//! [entered "world"]
+//! ```
+//!
+//! Run it piped to a child process:
+//! ```
+//! $ cargo run --quiet --example repl '$(cargo run --quiet --example repl-child -)'
+//! [entered "hello"]
+//! [entered "world"]
+//! ```
+//!
+//! Run it connected to the same program but use a socket instead of a
+//! pipe -- note that this opens a network port!
+//! ```
+//! $ cargo run --quiet --example repl accept://localhost:9999 &
+//! ...
+//! $ cargo run --quiet --example repl-child connect://localhost:9999
+//! [entered "hello"]
+//! [entered "world"]
+//! ```
 
 use nameless::{BufReaderLineWriter, InteractiveByteStream};
 use std::io::{BufRead, Write};
@@ -12,8 +38,16 @@ fn main(io: InteractiveByteStream) -> anyhow::Result<()> {
         write!(io, "prompt> ")?;
 
         if io.read_line(&mut s)? == 0 {
-            // End of stream. Tidy up the terminal and exit.
-            writeln!(io)?;
+            // End of stream. Tidy up the terminal and exit. Ignore broken-pipe
+            // errors because the input is closed, so the output may well be
+            // closed too.
+            match writeln!(io) {
+                Ok(()) => {}
+                Err(e) => match e.kind() {
+                    std::io::ErrorKind::BrokenPipe => {} // ignore
+                    _ => return Err(e.into()),
+                },
+            }
             return Ok(());
         }
 
@@ -21,7 +55,7 @@ fn main(io: InteractiveByteStream) -> anyhow::Result<()> {
             return Ok(());
         }
 
-        writeln!(io, "[you entered \"{}\"]", s.trim().escape_default())?;
+        eprintln!("[entered \"{}\"]", s.trim().escape_default());
 
         s.clear();
     }

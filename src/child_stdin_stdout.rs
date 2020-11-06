@@ -9,7 +9,6 @@ use std::{
 
 /// A child's (stdin, stdout) pair which can implement the `ReadWrite` trait.
 pub(crate) struct ChildStdinStdout {
-    _child: Child, // fixme?
     stdout: ChildStdout,
     stdin: ChildStdin,
 }
@@ -18,7 +17,7 @@ impl ChildStdinStdout {
     pub(crate) fn new(mut child: Child) -> Option<Self> {
         let stdout = child.stdout.take()?;
         let stdin = child.stdin.take()?;
-        Some(Self { _child: child, stdin, stdout })
+        Some(Self { stdin, stdout })
     }
 }
 

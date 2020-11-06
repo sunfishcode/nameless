@@ -21,8 +21,11 @@ use url::Url;
 ///  - Names starting with `file:` are interpreted as local filesystem
 ///    URLs providing paths to files to open.
 ///  - "-" is interpreted as standard output.
+///  - "(...)" runs a command with a pipe to the child process' stdin,
+///    on platforms whch support it.
 ///  - Names which don't parse as URLs are interpreted as plain local
-///    filesystem paths.
+///    filesystem paths. To force a string to be interpreted as a plain
+///    local path, arrange for it to begin with `./` or `/`.
 ///
 /// Programs using `OutputByteStream` as an argument should avoid using
 /// `std::io::stdout`, `std::println`, or anything else which uses standard
@@ -62,6 +65,12 @@ impl OutputByteStream {
         // Special-case "-" to mean stdout.
         if s == "-" {
             return Self::stdout();
+        }
+
+        // Strings beginning with "$(" are commands.
+        #[cfg(not(windows))]
+        if s.starts_with("$(") {
+            return Self::from_child(s);
         }
 
         // Otherwise try opening it as a path in the filesystem namespace.
@@ -131,6 +140,29 @@ impl OutputByteStream {
                 mime,
             })
         }
+    }
+
+    #[cfg(not(windows))]
+    fn from_child(s: &str) -> anyhow::Result<Self> {
+        use std::process::{Command, Stdio};
+        assert!(s.starts_with("$("));
+        if !s.ends_with(')') {
+            return Err(anyhow!("child string must end in ')'"));
+        }
+        let words = shell_words::split(&s[2..s.len() - 1])?;
+        let (first, rest) = words
+            .split_first()
+            .ok_or_else(|| anyhow!("child stream specified with '(...)' must contain a command"))?;
+        let child = Command::new(first)
+            .args(rest)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .spawn()?;
+        Ok(Self {
+            name: s.to_owned(),
+            writer: Box::new(child.stdin.unwrap()),
+            mime: None,
+        })
     }
 }
 

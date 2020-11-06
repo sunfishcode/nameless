@@ -25,6 +25,8 @@ use {crate::path_to_name::path_to_name, std::fs::OpenOptions};
 ///    Socket addresses may contain host:port pairs or, on platforms which
 ///    support it, filesystem paths to Unix-domain sockets.
 ///  - "-" is interpreted as the pair (stdin, stdout).
+///  - "(...)" runs a command with pipes to and from the child process'
+///    (stdin, stdout), on platforms whch support it.
 pub struct InteractiveByteStream {
     name: String,
     reader_writer: Box<dyn ReadWrite>,
@@ -47,6 +49,12 @@ impl InteractiveByteStream {
         // Special-case "-" to mean (stdin, stdout).
         if s == "-" {
             return Self::stdin_stdout();
+        }
+
+        // Strings beginning with "$(" are commands.
+        #[cfg(not(windows))]
+        if s.starts_with("$(") {
+            return Self::from_child(s);
         }
 
         // Otherwise try opening it as a path in the filesystem namespace.
@@ -207,6 +215,26 @@ impl InteractiveByteStream {
         Err(anyhow!(
             "interactive filesystem paths not supported on Windows yet"
         ))
+    }
+
+    #[cfg(not(windows))]
+    fn from_child(s: &str) -> anyhow::Result<Self> {
+        assert!(s.starts_with("$("));
+        if !s.ends_with(')') {
+            return Err(anyhow!("child string must end in ')'"));
+        }
+        let words = shell_words::split(&s[2..s.len() - 1])?;
+        let (first, rest) = words
+            .split_first()
+            .ok_or_else(|| anyhow!("child stream specified with '(...)' must contain a command"))?;
+        let mut command = std::process::Command::new(first);
+        command.args(rest);
+        Ok(Self {
+            name: s.to_owned(),
+            reader_writer: Box::new(crate::command_stdin_stdout::CommandStdinStdout::new(
+                command,
+            )),
+        })
     }
 }
 

@@ -1,13 +1,8 @@
-//! An example child program for the `repl` example.
-//!
-//! ```
-//! $ repl '(repl-child -)'
-//! [entered "hello"]
-//! [entered "world"]
-//! ```
+//! An example child program for the `repl` example. See the `repl` example
+//! for details.
 
 use nameless::{BufReaderLineWriter, InteractiveByteStream};
-use std::io::{Write, Read};
+use std::io::{Read, Write};
 use std::str;
 
 #[kommand::main]
@@ -27,7 +22,10 @@ fn main(io: InteractiveByteStream) -> anyhow::Result<()> {
     // Read another "prompt> ".
     let n = io.read(&mut v)?;
     if str::from_utf8(&v[..n]).unwrap() != "prompt> " {
-        panic!("missed second prompt: {:?}", String::from_utf8_lossy(&v[..n]));
+        panic!(
+            "missed second prompt: {:?}",
+            String::from_utf8_lossy(&v[..n])
+        );
     }
 
     // Write "world".

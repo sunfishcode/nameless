@@ -148,6 +148,8 @@
 pub use mime::Mime;
 
 mod buffered;
+mod child_stdin_stdout;
+mod command_stdin_stdout;
 mod input_byte_stream;
 mod interactive_byte_stream;
 mod output_byte_stream;
