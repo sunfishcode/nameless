@@ -19,8 +19,7 @@ proc-macro2 = { version = "1.0.2", features = ["nightly"] }
 quote = "1.0.2"
 
 [dev-dependencies]
-paw = "1.0.0"
-structopt = { version = "0.3.20", features = ["paw"] }
+structopt = { version = "0.3.20" }
 
 [badges]
 maintenance = { status = "actively-developed" }

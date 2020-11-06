@@ -15,7 +15,7 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     if name != "main" {
         let tokens = quote_spanned! { name.span() =>
-            compile_error!("only fn main can be tagged with #[kommand::main]");
+            compile_error!("only `main` can be tagged with `#[kommand::main]`");
         };
         return TokenStream::from(tokens);
     }
@@ -55,7 +55,6 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let result = {
         let mut args = Vec::new();
         let mut arg_names = Vec::new();
-        let mut no_mut_arg_names = Vec::new();
         let mut arg_types = Vec::new();
         for input in inputs {
             let arg = match input {
@@ -88,20 +87,18 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
             let mut no_mut_arg = arg.clone();
             no_mut_arg.pat = Box::new(syn::Pat::Ident(no_mut_ident));
 
-            no_mut_arg_names.push(no_mut_arg.pat.clone());
             args.push(no_mut_arg);
         }
         quote! {
             #[derive(structopt::StructOpt)]
             #[structopt(#(about=#abouts)*)]
-            struct Opt {
+            struct _KommandOpt {
                 #(#args,)*
             }
 
             #(#attrs)*
-            #[paw::main]
-            #asyncness fn main(opt: Opt) #ret {
-                #(let #arg_names = opt.#no_mut_arg_names;)*
+            #asyncness fn main() #ret {
+                let _KommandOpt { #(#arg_names,)* } = structopt::StructOpt::from_args();
 
                 #body
             }
