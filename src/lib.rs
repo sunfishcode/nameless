@@ -148,7 +148,9 @@
 pub use mime::Mime;
 
 mod buffered;
+#[cfg(not(windows))]
 mod child_stdin_stdout;
+#[cfg(not(windows))]
 mod command_stdin_stdout;
 mod input_byte_stream;
 mod interactive_byte_stream;

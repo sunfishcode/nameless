@@ -6,7 +6,9 @@ pub trait ReadWrite: Read + Write {}
 
 // Implement `ReadWrite` for our stream types.
 impl ReadWrite for crate::stdin_stdout::StdinStdout {}
+#[cfg(not(windows))]
 impl ReadWrite for crate::child_stdin_stdout::ChildStdinStdout {}
+#[cfg(not(windows))]
 impl ReadWrite for crate::command_stdin_stdout::CommandStdinStdout {}
 impl ReadWrite for crate::interactive_byte_stream::InteractiveByteStream {}
 impl<RW: ReadWrite> ReadWrite for crate::BufReaderWriter<RW> {}
