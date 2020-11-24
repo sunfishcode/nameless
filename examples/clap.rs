@@ -1,23 +1,23 @@
-//! A simple example of using `structopt` with `InputByteStream` and
+//! A simple example of using `clap_derive` with `InputByteStream` and
 //! `OutputByteStream`. Compared to [`structopt`'s example], it's
 //! simpler and requires less boilerplate.
 //!
 //! [`structopt`'s example]: https://docs.rs/structopt/latest/structopt/#how-to-derivestructopt
 
+use clap::Clap;
 use nameless::{InputByteStream, OutputByteStream};
-use structopt::StructOpt;
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "example", about = "An example of StructOpt usage.")]
+#[derive(Debug, Clap)]
+#[clap(name = "example", about = "An example of StructOpt usage.")]
 struct Opt {
     /// Activate debug mode
     // short and long flags (-d, --debug) will be deduced from the field's name
-    #[structopt(short, long)]
+    #[clap(short, long)]
     debug: bool,
 
     /// Set speed
     // we don't want to name it "speed", need to look smart
-    #[structopt(short = "v", long = "velocity", default_value = "42")]
+    #[clap(short = 'v', long = "velocity", default_value = "42")]
     speed: f64,
 
     /// Input source
@@ -28,6 +28,6 @@ struct Opt {
 }
 
 fn main() {
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
     println!("{:?}", opt);
 }

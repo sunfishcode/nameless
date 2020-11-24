@@ -21,7 +21,7 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     // Convert the function's documentation comment into an `about` attribute
-    // for `structopt`.
+    // for `clap`.
     let mut abouts = Vec::new();
     let mut about = String::new();
     for attr in attrs {
@@ -90,15 +90,15 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
             args.push(no_mut_arg);
         }
         quote! {
-            #[derive(structopt::StructOpt)]
-            #[structopt(#(about=#abouts)*)]
+            #[derive(clap::Clap)]
+            #[clap(#(about=#abouts)*)]
             struct _KommandOpt {
                 #(#args,)*
             }
 
             #(#attrs)*
             #asyncness fn main() #ret {
-                let _KommandOpt { #(#arg_names,)* } = structopt::StructOpt::from_args();
+                let _KommandOpt { #(#arg_names,)* } = clap::Clap::parse();
 
                 #body
             }

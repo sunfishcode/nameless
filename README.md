@@ -128,6 +128,8 @@ more examples.
 
 [`InputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html
 [`OutputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.OutputByteStream.html
+[`InputTextStream`]: https://docs.rs/nameless/latest/nameless/struct.InputTextStream.html
+[`OutputTextStream`]: https://docs.rs/nameless/latest/nameless/struct.OutputTextStream.html
 [`InteractiveByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InteractiveByteStream.html
 [`BufReaderWriter`]: https://docs.rs/nameless/latest/nameless/struct.BufReaderWriter.html
 [`BufReaderLineWriter`]: https://docs.rs/nameless/latest/nameless/struct.BufReaderLineWriter.html

@@ -2,12 +2,12 @@
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
 use super::{IntoInnerError, DEFAULT_BUF_SIZE};
-use crate::ReadWrite;
+use io_ext::{ReadExt, SliceReader, Status, WriteExt};
 #[cfg(feature = "nightly")]
 use std::io::Initializer;
 use std::{
     cmp, fmt,
-    io::{self, BufRead, Error, ErrorKind, IoSlice, IoSliceMut, Read, Write},
+    io::{self, BufRead, Error, ErrorKind, IoSlice, IoSliceMut, Write},
 };
 
 /// Wraps a reader and writer and buffers their output.
@@ -99,7 +99,11 @@ use std::{
 /// [`TcpStream::write`]: std::io::Write::write
 /// [`TcpStream`]: std::net::TcpStream
 /// [`flush`]: std::io::Write::flush
-pub struct BufReaderWriter<RW: ReadWrite> {
+pub struct BufReaderWriter<RW: io::Read + io::Write> {
+    inner: BufReaderWriterBackend<RW>,
+}
+
+pub(crate) struct BufReaderWriterBackend<RW: io::Read + io::Write> {
     inner: Option<RW>,
     writer_buf: Vec<u8>,
     // #30888: If the inner writer panics in a call to write, we don't want to
@@ -113,7 +117,7 @@ pub struct BufReaderWriter<RW: ReadWrite> {
     cap: usize,
 }
 
-impl<RW: ReadWrite> BufReaderWriter<RW> {
+impl<RW: io::Read + io::Write> BufReaderWriter<RW> {
     /// Creates a new `BufReaderWriter<RW>` with default buffer capacities. The default is currently 8 KB,
     /// but may change in the future.
     ///
@@ -125,8 +129,11 @@ impl<RW: ReadWrite> BufReaderWriter<RW> {
     ///
     /// let mut buffer = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     /// ```
+    #[inline]
     pub fn new(inner: RW) -> Self {
-        Self::with_capacities(DEFAULT_BUF_SIZE, DEFAULT_BUF_SIZE, inner)
+        Self {
+            inner: BufReaderWriterBackend::new(inner),
+        }
     }
 
     /// Creates a new `BufReaderWriter<RW>` with the specified buffer capacities.
@@ -142,6 +149,169 @@ impl<RW: ReadWrite> BufReaderWriter<RW> {
     /// let stream = TcpStream::connect("127.0.0.1:34254").unwrap();
     /// let mut buffer = BufReaderWriter::with_capacities(10, 100, stream);
     /// ```
+    #[inline]
+    pub fn with_capacities(reader_capacity: usize, writer_capacity: usize, inner: RW) -> Self {
+        Self {
+            inner: BufReaderWriterBackend::with_capacities(reader_capacity, writer_capacity, inner),
+        }
+    }
+
+    /// Gets a reference to the underlying reader/writer.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use nameless::BufReaderWriter;
+    /// use std::net::TcpStream;
+    ///
+    /// let mut buffer = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
+    ///
+    /// // we can use reference just like buffer
+    /// let reference = buffer.get_ref();
+    /// ```
+    #[inline]
+    pub fn get_ref(&self) -> &RW {
+        self.inner.get_ref()
+    }
+
+    /// Gets a mutable reference to the underlying reader/writer.
+    ///
+    /// It is inadvisable to directly write to the underlying reader/writer.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use nameless::BufReaderWriter;
+    /// use std::net::TcpStream;
+    ///
+    /// let mut buffer = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
+    ///
+    /// // we can use reference just like buffer
+    /// let reference = buffer.get_mut();
+    /// ```
+    #[inline]
+    pub fn get_mut(&mut self) -> &mut RW {
+        self.inner.get_mut()
+    }
+
+    /// Returns a reference to the internally buffered writer data.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use nameless::BufReaderWriter;
+    /// use std::net::TcpStream;
+    ///
+    /// let buf_writer = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
+    ///
+    /// // See how many bytes are currently buffered
+    /// let bytes_buffered = buf_writer.writer_buffer().len();
+    /// ```
+    #[inline]
+    pub fn writer_buffer(&self) -> &[u8] {
+        self.inner.writer_buffer()
+    }
+
+    /// Returns a reference to the internally buffered reader data.
+    ///
+    /// Unlike [`fill_buf`], this will not attempt to fill the buffer if it is empty.
+    ///
+    /// [`fill_buf`]: BufRead::fill_buf
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use nameless::BufReaderWriter;
+    /// use std::{fs::File, io::BufRead};
+    ///
+    /// fn main() -> std::io::Result<()> {
+    ///     let f = File::open("log.txt")?;
+    ///     let mut reader = BufReaderWriter::new(f);
+    ///     assert!(reader.reader_buffer().is_empty());
+    ///
+    ///     if reader.fill_buf()?.len() > 0 {
+    ///         assert!(!reader.reader_buffer().is_empty());
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn reader_buffer(&self) -> &[u8] {
+        self.inner.reader_buffer()
+    }
+
+    /// Returns the number of bytes the internal writer buffer can hold without flushing.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use nameless::BufReaderWriter;
+    /// use std::net::TcpStream;
+    ///
+    /// let buf_reader_writer = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
+    ///
+    /// // Check the capacity of the inner buffer
+    /// let capacity = buf_reader_writer.writer_capacity();
+    /// // Calculate how many bytes can be written without flushing
+    /// let without_flush = capacity - buf_reader_writer.writer_buffer().len();
+    /// ```
+    #[inline]
+    pub fn writer_capacity(&self) -> usize {
+        self.inner.writer_capacity()
+    }
+
+    /// Returns the number of bytes the internal reader buffer can hold at once.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use nameless::BufReaderWriter;
+    /// use std::{fs::File, io::BufRead};
+    ///
+    /// fn main() -> std::io::Result<()> {
+    ///     let f = File::open("log.txt")?;
+    ///     let mut reader = BufReaderWriter::new(f);
+    ///
+    ///     let capacity = reader.reader_capacity();
+    ///     let buffer = reader.fill_buf()?;
+    ///     assert!(buffer.len() <= capacity);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn reader_capacity(&self) -> usize {
+        self.inner.reader_capacity()
+    }
+
+    /// Unwraps this `BufReaderWriter<RW>`, returning the underlying reader/writer.
+    ///
+    /// The buffer is written out before returning the reader/writer.
+    ///
+    /// # Errors
+    ///
+    /// An [`Err`] will be returned if an error occurs while flushing the buffer.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use nameless::BufReaderWriter;
+    /// use std::net::TcpStream;
+    ///
+    /// let mut buffer = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
+    ///
+    /// // unwrap the TcpStream and flush the buffer
+    /// let stream = buffer.into_inner().unwrap();
+    /// ```
+    pub fn into_inner(self) -> Result<RW, IntoInnerError<Self>> {
+        self.inner
+            .into_inner()
+            .map_err(|err| err.new_wrapped(|inner| Self { inner }))
+    }
+}
+
+impl<RW: io::Read + io::Write> BufReaderWriterBackend<RW> {
+    pub fn new(inner: RW) -> Self {
+        Self::with_capacities(DEFAULT_BUF_SIZE, DEFAULT_BUF_SIZE, inner)
+    }
+
     pub fn with_capacities(reader_capacity: usize, writer_capacity: usize, inner: RW) -> Self {
         #[cfg(not(feature = "nightly"))]
         let buffer = vec![0; reader_capacity];
@@ -241,150 +411,34 @@ impl<RW: ReadWrite> BufReaderWriter<RW> {
         amt_to_buffer
     }
 
-    /// Gets a reference to the underlying reader/writer.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use nameless::BufReaderWriter;
-    /// use std::net::TcpStream;
-    ///
-    /// let mut buffer = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
-    ///
-    /// // we can use reference just like buffer
-    /// let reference = buffer.get_ref();
-    /// ```
     #[inline]
     pub fn get_ref(&self) -> &RW {
         self.inner.as_ref().unwrap()
     }
 
-    /// Gets a mutable reference to the underlying reader/writer.
-    ///
-    /// It is inadvisable to directly write to the underlying reader/writer.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use nameless::BufReaderWriter;
-    /// use std::net::TcpStream;
-    ///
-    /// let mut buffer = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
-    ///
-    /// // we can use reference just like buffer
-    /// let reference = buffer.get_mut();
-    /// ```
     #[inline]
     pub fn get_mut(&mut self) -> &mut RW {
         self.inner.as_mut().unwrap()
     }
 
-    /// Returns a reference to the internally buffered writer data.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use nameless::BufReaderWriter;
-    /// use std::net::TcpStream;
-    ///
-    /// let buf_writer = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
-    ///
-    /// // See how many bytes are currently buffered
-    /// let bytes_buffered = buf_writer.writer_buffer().len();
-    /// ```
     #[inline]
     pub fn writer_buffer(&self) -> &[u8] {
         &self.writer_buf
     }
 
-    /// Returns a reference to the internally buffered reader data.
-    ///
-    /// Unlike [`fill_buf`], this will not attempt to fill the buffer if it is empty.
-    ///
-    /// [`fill_buf`]: BufRead::fill_buf
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use nameless::BufReaderWriter;
-    /// use std::{fs::File, io::BufRead};
-    ///
-    /// fn main() -> std::io::Result<()> {
-    ///     let f = File::open("log.txt")?;
-    ///     let mut reader = BufReaderWriter::new(f);
-    ///     assert!(reader.reader_buffer().is_empty());
-    ///
-    ///     if reader.fill_buf()?.len() > 0 {
-    ///         assert!(!reader.reader_buffer().is_empty());
-    ///     }
-    ///     Ok(())
-    /// }
-    /// ```
     pub fn reader_buffer(&self) -> &[u8] {
         &self.reader_buf[self.pos..self.cap]
     }
 
-    /// Returns the number of bytes the internal writer buffer can hold without flushing.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use nameless::BufReaderWriter;
-    /// use std::net::TcpStream;
-    ///
-    /// let buf_reader_writer = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
-    ///
-    /// // Check the capacity of the inner buffer
-    /// let capacity = buf_reader_writer.writer_capacity();
-    /// // Calculate how many bytes can be written without flushing
-    /// let without_flush = capacity - buf_reader_writer.writer_buffer().len();
-    /// ```
     #[inline]
     pub fn writer_capacity(&self) -> usize {
         self.writer_buf.capacity()
     }
 
-    /// Returns the number of bytes the internal reader buffer can hold at once.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use nameless::BufReaderWriter;
-    /// use std::{fs::File, io::BufRead};
-    ///
-    /// fn main() -> std::io::Result<()> {
-    ///     let f = File::open("log.txt")?;
-    ///     let mut reader = BufReaderWriter::new(f);
-    ///
-    ///     let capacity = reader.reader_capacity();
-    ///     let buffer = reader.fill_buf()?;
-    ///     assert!(buffer.len() <= capacity);
-    ///     Ok(())
-    /// }
-    /// ```
     pub fn reader_capacity(&self) -> usize {
         self.reader_buf.len()
     }
 
-    /// Unwraps this `BufReaderWriter<RW>`, returning the underlying reader/writer.
-    ///
-    /// The buffer is written out before returning the reader/writer.
-    ///
-    /// # Errors
-    ///
-    /// An [`Err`] will be returned if an error occurs while flushing the buffer.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use nameless::BufReaderWriter;
-    /// use std::net::TcpStream;
-    ///
-    /// let mut buffer = BufReaderWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
-    ///
-    /// // unwrap the TcpStream and flush the buffer
-    /// let stream = buffer.into_inner().unwrap();
-    /// ```
     pub fn into_inner(mut self) -> Result<RW, IntoInnerError<Self>> {
         match self.flush_buf() {
             Err(e) => Err(IntoInnerError::new(self, e)),
@@ -400,7 +454,86 @@ impl<RW: ReadWrite> BufReaderWriter<RW> {
     }
 }
 
-impl<RW: ReadWrite> Write for BufReaderWriter<RW> {
+impl<RW: io::Read + WriteExt> WriteExt for BufReaderWriter<RW> {
+    #[inline]
+    fn flush_with_status(&mut self, status: Status) -> io::Result<()> {
+        self.inner.flush_with_status(status)
+    }
+
+    #[inline]
+    fn abandon(&mut self) {
+        self.inner.abandon()
+    }
+
+    #[inline]
+    fn write_str(&mut self, buf: &str) -> io::Result<()> {
+        self.inner.write_str(buf)
+    }
+}
+
+impl<RW: io::Read + WriteExt> WriteExt for BufReaderWriterBackend<RW> {
+    #[inline]
+    fn flush_with_status(&mut self, status: Status) -> io::Result<()> {
+        self.flush_buf()
+            .and_then(|()| self.get_mut().flush_with_status(status))
+    }
+
+    #[inline]
+    fn abandon(&mut self) {
+        self.get_mut().abandon()
+    }
+
+    #[inline]
+    fn write_str(&mut self, buf: &str) -> io::Result<()> {
+        // Normally, `write_all` just calls `write` in a loop. We can do better
+        // by calling `self.get_mut().write_all()` directly, which avoids
+        // round trips through the buffer in the event of a series of partial
+        // writes in some circumstances.
+        if self.writer_buf.len() + buf.len() > self.writer_buf.capacity() {
+            self.flush_buf()?;
+        }
+        // FIXME: Why no len > capacity? Why not buffer len == capacity? #72919
+        if buf.len() >= self.writer_buf.capacity() {
+            self.panicked = true;
+            let r = self.get_mut().write_str(buf);
+            self.panicked = false;
+            r
+        } else {
+            self.writer_buf.extend_from_slice(buf.as_bytes());
+            Ok(())
+        }
+    }
+}
+
+impl<RW: io::Read + io::Write> io::Write for BufReaderWriter<RW> {
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.inner.write(buf)
+    }
+
+    #[inline]
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        self.inner.write_all(buf)
+    }
+
+    #[inline]
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        self.inner.write_vectored(bufs)
+    }
+
+    #[cfg(feature = "nightly")]
+    #[inline]
+    fn is_write_vectored(&self) -> bool {
+        self.inner.is_write_vectored()
+    }
+
+    #[inline]
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl<RW: io::Read + io::Write> io::Write for BufReaderWriterBackend<RW> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if self.writer_buf.len() + buf.len() > self.writer_buf.capacity() {
             self.flush_buf()?;
@@ -467,41 +600,100 @@ impl<RW: ReadWrite> Write for BufReaderWriter<RW> {
     }
 }
 
-impl<RW: ReadWrite> Read for BufReaderWriter<RW> {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+impl<RW: ReadExt + WriteExt> ReadExt for BufReaderWriter<RW> {
+    #[inline]
+    fn read_with_status(&mut self, buf: &mut [u8]) -> io::Result<(usize, Status)> {
         // Flush the writer half of this `BufReaderWriter` before reading.
-        self.flush()?;
+        self.inner.flush()?;
 
+        self.inner.read_with_status(buf)
+    }
+
+    #[inline]
+    fn read_vectored_with_status(
+        &mut self,
+        bufs: &mut [IoSliceMut<'_>],
+    ) -> io::Result<(usize, Status)> {
+        // Flush the writer half of this `BufReaderWriter` before reading.
+        self.inner.flush()?;
+
+        self.inner.read_vectored_with_status(bufs)
+    }
+}
+
+impl<RW: ReadExt + WriteExt> ReadExt for BufReaderWriterBackend<RW> {
+    fn read_with_status(&mut self, buf: &mut [u8]) -> io::Result<(usize, Status)> {
         // If we don't have any buffered data and we're doing a massive read
         // (larger than our internal buffer), bypass our internal buffer
         // entirely.
         if self.pos == self.cap && buf.len() >= self.reader_buf.len() {
             self.discard_reader_buffer();
-            return self.inner.as_mut().unwrap().read(buf);
+            return self.inner.as_mut().unwrap().read_with_status(buf);
         }
-        let nread = {
-            let mut rem = self.fill_buf()?;
-            rem.read(buf)?
+        let size_and_status = {
+            let mut rem = SliceReader::new(self.fill_buf()?);
+            rem.read_with_status(buf)?
         };
-        self.consume(nread);
-        Ok(nread)
+        self.consume(size_and_status.0);
+        Ok(size_and_status)
     }
 
-    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        // Flush the writer half of this `BufReaderWriter` before reading.
-        self.flush()?;
-
+    fn read_vectored_with_status(
+        &mut self,
+        bufs: &mut [IoSliceMut<'_>],
+    ) -> io::Result<(usize, Status)> {
         let total_len = bufs.iter().map(|b| b.len()).sum::<usize>();
         if self.pos == self.cap && total_len >= self.reader_buf.len() {
             self.discard_reader_buffer();
-            return self.inner.as_mut().unwrap().read_vectored(bufs);
+            return self.inner.as_mut().unwrap().read_vectored_with_status(bufs);
         }
-        let nread = {
-            let mut rem = self.fill_buf()?;
-            rem.read_vectored(bufs)?
+        let size_and_status = {
+            let mut rem = SliceReader::new(self.fill_buf()?);
+            rem.read_vectored_with_status(bufs)?
         };
-        self.consume(nread);
-        Ok(nread)
+        self.consume(size_and_status.0);
+        Ok(size_and_status)
+    }
+}
+
+impl<RW: io::Read + io::Write> io::Read for BufReaderWriter<RW> {
+    #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        // Flush the writer half of this `BufReaderWriter` before reading.
+        self.inner.flush()?;
+
+        self.inner.read(buf)
+    }
+
+    #[inline]
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        // Flush the writer half of this `BufReaderWriter` before reading.
+        self.inner.flush()?;
+
+        self.inner.read_vectored(bufs)
+    }
+
+    #[cfg(feature = "nightly")]
+    #[inline]
+    fn is_read_vectored(&self) -> bool {
+        self.inner.is_read_vectored()
+    }
+
+    // we can't skip unconditionally because of the large buffer case in read.
+    #[cfg(feature = "nightly")]
+    #[inline]
+    unsafe fn initializer(&self) -> Initializer {
+        self.inner.initializer()
+    }
+}
+
+impl<RW: io::Read + io::Write> io::Read for BufReaderWriterBackend<RW> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.as_mut().unwrap().read(buf)
+    }
+
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        self.inner.as_mut().unwrap().read_vectored(bufs)
     }
 
     #[cfg(feature = "nightly")]
@@ -516,16 +708,41 @@ impl<RW: ReadWrite> Read for BufReaderWriter<RW> {
     }
 }
 
-impl<RW: ReadWrite> BufRead for BufReaderWriter<RW> {
+impl<RW: io::Read + io::Write> BufRead for BufReaderWriter<RW> {
+    #[inline]
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        self.inner.fill_buf()
+    }
+
+    #[inline]
+    fn consume(&mut self, amt: usize) {
+        self.inner.consume(amt)
+    }
+
+    #[inline]
+    fn read_until(&mut self, byte: u8, buf: &mut Vec<u8>) -> io::Result<usize> {
+        // Flush the writer half of this `BufReaderWriter` before reading.
+        self.inner.flush()?;
+
+        self.inner.read_until(byte, buf)
+    }
+
+    #[inline]
+    fn read_line(&mut self, buf: &mut String) -> io::Result<usize> {
+        // Flush the writer half of this `BufReaderWriter` before reading.
+        self.inner.flush()?;
+
+        self.inner.read_line(buf)
+    }
+}
+
+impl<RW: io::Read + io::Write> BufRead for BufReaderWriterBackend<RW> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         // If we've reached the end of our internal buffer then we need to fetch
         // some more data from the underlying reader.
         // Branch using `>=` instead of the more correct `==`
         // to tell the compiler that the pos..cap slice is always valid.
         if self.pos >= self.cap {
-            // Flush the writer half of this `BufReaderWriter` before reading.
-            self.flush()?;
-
             debug_assert!(self.pos == self.cap);
             self.cap = self.inner.as_mut().unwrap().read(&mut self.reader_buf)?;
             self.pos = 0;
@@ -538,7 +755,16 @@ impl<RW: ReadWrite> BufRead for BufReaderWriter<RW> {
     }
 }
 
-impl<RW: ReadWrite> fmt::Debug for BufReaderWriter<RW>
+impl<RW: io::Read + io::Write> fmt::Debug for BufReaderWriter<RW>
+where
+    RW: fmt::Debug,
+{
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.inner.fmt(fmt)
+    }
+}
+
+impl<RW: io::Read + io::Write> fmt::Debug for BufReaderWriterBackend<RW>
 where
     RW: fmt::Debug,
 {
@@ -557,7 +783,7 @@ where
     }
 }
 
-impl<RW: ReadWrite> Drop for BufReaderWriter<RW> {
+impl<RW: io::Read + io::Write> Drop for BufReaderWriterBackend<RW> {
     fn drop(&mut self) {
         if self.inner.is_some() && !self.panicked {
             // dtors should not panic, so we ignore a failed flush

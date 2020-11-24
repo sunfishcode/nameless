@@ -1,28 +1,44 @@
 //! Define `StdinStdout`, an interactive stream object formed by combining
 //! stdin and stdout.
 
-use crate::stdio_raw::{StdinRaw, StdoutRaw};
+use io_ext::{ReadExt, Status, WriteExt};
+use raw_stdio::{RawStdin, RawStdout};
 use std::{
     fmt::Arguments,
-    io::{self, IoSlice, IoSliceMut, Read, Write},
+    io::{self, IoSlice, IoSliceMut},
 };
 
 /// A raw (stdin, stdout) pair which can implement the `ReadWrite` trait.
 pub(crate) struct StdinStdout {
-    stdin: StdinRaw,
-    stdout: StdoutRaw,
+    stdin: RawStdin,
+    stdout: RawStdout,
 }
 
 impl StdinStdout {
     pub(crate) fn new() -> Option<Self> {
         Some(Self {
-            stdin: StdinRaw::new()?,
-            stdout: StdoutRaw::new()?,
+            stdin: RawStdin::new()?,
+            stdout: RawStdout::new()?,
         })
     }
 }
 
-impl Read for StdinStdout {
+impl ReadExt for StdinStdout {
+    #[inline]
+    fn read_with_status(&mut self, buf: &mut [u8]) -> io::Result<(usize, Status)> {
+        self.stdin.read_with_status(buf)
+    }
+
+    #[inline]
+    fn read_vectored_with_status(
+        &mut self,
+        bufs: &mut [IoSliceMut<'_>],
+    ) -> io::Result<(usize, Status)> {
+        self.stdin.read_vectored_with_status(bufs)
+    }
+}
+
+impl io::Read for StdinStdout {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.stdin.read(buf)
@@ -55,7 +71,24 @@ impl Read for StdinStdout {
     }
 }
 
-impl Write for StdinStdout {
+impl WriteExt for StdinStdout {
+    #[inline]
+    fn flush_with_status(&mut self, status: Status) -> io::Result<()> {
+        self.stdout.flush_with_status(status)
+    }
+
+    #[inline]
+    fn abandon(&mut self) {
+        self.stdout.abandon()
+    }
+
+    #[inline]
+    fn write_str(&mut self, buf: &str) -> io::Result<()> {
+        self.stdout.write_str(buf)
+    }
+}
+
+impl io::Write for StdinStdout {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.stdout.write(buf)

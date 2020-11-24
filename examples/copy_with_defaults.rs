@@ -1,7 +1,7 @@
 //! A simple program using `kommand` that copies from an
 //! `InputByteStream` into an `OutputByteStream`.
 
-use nameless::{InputByteStream, OutputByteStream};
+use nameless::{InputByteStream, OutputByteStream, Type};
 use std::io::copy;
 
 #[rustfmt::skip] // TODO: rustfmt mishandles doc comments on arguments
@@ -21,7 +21,7 @@ fn main(
     let mut output = if let Some(output) = output {
         output
     } else {
-        OutputByteStream::stdout()?
+        OutputByteStream::stdout(Type::unknown())?
     };
 
     copy(&mut input, &mut output)?;

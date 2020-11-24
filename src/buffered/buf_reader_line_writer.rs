@@ -1,11 +1,11 @@
 //! This file is derived from Rust's library/std/src/io/buffered at revision
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
-use super::{BufReaderLineWriterShim, BufReaderWriter, IntoInnerError};
-use crate::ReadWrite;
+use super::{buf_reader_writer::BufReaderWriterBackend, BufReaderLineWriterShim, IntoInnerError};
+use io_ext::{ReadExt, Status, WriteExt};
 use std::{
     fmt,
-    io::{self, BufRead, IoSlice, IoSliceMut, Read, Write},
+    io::{self, BufRead, IoSlice, IoSliceMut, Write},
 };
 
 /// Wraps a reader and writer and buffers input and output to and from it, flushing
@@ -57,10 +57,12 @@ use std::{
 ///     );
 ///
 ///     // Write the rest of the poem.
-///     file.write_all(b"Somewhere ages and ages hence:
+///     file.write_all(
+///         b"Somewhere ages and ages hence:
 /// Two roads diverged in a wood, and I -
 /// I took the one less traveled by,
-/// And that has made all the difference.")?;
+/// And that has made all the difference.",
+///     )?;
 ///
 ///     // The last line of the poem doesn't end in a newline, so
 ///     // we have to flush or drop the `BufReaderLineWriter` to finish
@@ -72,11 +74,15 @@ use std::{
 ///     Ok(())
 /// }
 /// ```
-pub struct BufReaderLineWriter<RW: ReadWrite> {
-    inner: BufReaderWriter<RW>,
+pub struct BufReaderLineWriter<RW: io::Read + io::Write> {
+    inner: BufReaderLineWriterBackend<RW>,
 }
 
-impl<RW: ReadWrite> BufReaderLineWriter<RW> {
+struct BufReaderLineWriterBackend<RW: io::Read + io::Write> {
+    inner: BufReaderWriterBackend<RW>,
+}
+
+impl<RW: io::Read + io::Write> BufReaderLineWriter<RW> {
     /// Creates a new `BufReaderLineWriter`.
     ///
     /// # Examples
@@ -91,9 +97,11 @@ impl<RW: ReadWrite> BufReaderLineWriter<RW> {
     ///     Ok(())
     /// }
     /// ```
+    #[inline]
     pub fn new(inner: RW) -> Self {
-        // Lines typically aren't that long, don't use giant buffers
-        Self::with_capacities(1024, 1024, inner)
+        Self {
+            inner: BufReaderLineWriterBackend::new(inner),
+        }
     }
 
     /// Creates a new `BufReaderLineWriter` with a specified capacities for the internal
@@ -111,9 +119,14 @@ impl<RW: ReadWrite> BufReaderLineWriter<RW> {
     ///     Ok(())
     /// }
     /// ```
+    #[inline]
     pub fn with_capacities(reader_capacity: usize, writer_capacity: usize, inner: RW) -> Self {
         Self {
-            inner: BufReaderWriter::with_capacities(reader_capacity, writer_capacity, inner),
+            inner: BufReaderLineWriterBackend::with_capacities(
+                reader_capacity,
+                writer_capacity,
+                inner,
+            ),
         }
     }
 
@@ -186,6 +199,7 @@ impl<RW: ReadWrite> BufReaderLineWriter<RW> {
     ///     Ok(())
     /// }
     /// ```
+    #[inline]
     pub fn into_inner(self) -> Result<RW, IntoInnerError<Self>> {
         self.inner
             .into_inner()
@@ -193,7 +207,109 @@ impl<RW: ReadWrite> BufReaderLineWriter<RW> {
     }
 }
 
-impl<RW: ReadWrite> Write for BufReaderLineWriter<RW> {
+impl<RW: io::Read + io::Write> BufReaderLineWriterBackend<RW> {
+    pub fn new(inner: RW) -> Self {
+        // Lines typically aren't that long, don't use giant buffers
+        Self::with_capacities(1024, 1024, inner)
+    }
+
+    pub fn with_capacities(reader_capacity: usize, writer_capacity: usize, inner: RW) -> Self {
+        Self {
+            inner: BufReaderWriterBackend::with_capacities(reader_capacity, writer_capacity, inner),
+        }
+    }
+
+    #[inline]
+    pub fn get_ref(&self) -> &RW {
+        self.inner.get_ref()
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self) -> &mut RW {
+        self.inner.get_mut()
+    }
+
+    pub fn into_inner(self) -> Result<RW, IntoInnerError<Self>> {
+        self.inner
+            .into_inner()
+            .map_err(|err| err.new_wrapped(|inner| Self { inner }))
+    }
+}
+
+impl<RW: io::Read + WriteExt> WriteExt for BufReaderLineWriter<RW> {
+    #[inline]
+    fn flush_with_status(&mut self, status: Status) -> io::Result<()> {
+        self.inner.flush_with_status(status)
+    }
+
+    #[inline]
+    fn abandon(&mut self) {
+        self.inner.abandon()
+    }
+
+    #[inline]
+    fn write_str(&mut self, buf: &str) -> io::Result<()> {
+        self.inner.write_str(buf)
+    }
+}
+
+impl<RW: io::Read + WriteExt> WriteExt for BufReaderLineWriterBackend<RW> {
+    #[inline]
+    fn flush_with_status(&mut self, status: Status) -> io::Result<()> {
+        self.inner.flush_with_status(status)
+    }
+
+    #[inline]
+    fn abandon(&mut self) {
+        self.inner.abandon()
+    }
+
+    #[inline]
+    fn write_str(&mut self, buf: &str) -> io::Result<()> {
+        BufReaderLineWriterShim::new(&mut self.inner).write_str(buf)
+    }
+}
+
+impl<RW: io::Read + io::Write> io::Write for BufReaderLineWriter<RW> {
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.inner.write(buf)
+    }
+
+    #[inline]
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+
+    #[inline]
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        self.inner.write_vectored(bufs)
+    }
+
+    #[cfg(feature = "nightly")]
+    #[inline]
+    fn is_write_vectored(&self) -> bool {
+        self.inner.is_write_vectored()
+    }
+
+    #[inline]
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        self.inner.write_all(buf)
+    }
+
+    #[cfg(feature = "nightly")]
+    #[inline]
+    fn write_all_vectored(&mut self, bufs: &mut [IoSlice<'_>]) -> io::Result<()> {
+        self.inner.write_all_vectored(bufs)
+    }
+
+    #[inline]
+    fn write_fmt(&mut self, fmt: fmt::Arguments<'_>) -> io::Result<()> {
+        self.inner.write_fmt(fmt)
+    }
+}
+
+impl<RW: io::Read + io::Write> io::Write for BufReaderLineWriterBackend<RW> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         BufReaderLineWriterShim::new(&mut self.inner).write(buf)
@@ -232,7 +348,73 @@ impl<RW: ReadWrite> Write for BufReaderLineWriter<RW> {
     }
 }
 
-impl<RW: ReadWrite> Read for BufReaderLineWriter<RW> {
+impl<RW: ReadExt + WriteExt> ReadExt for BufReaderLineWriter<RW> {
+    #[inline]
+    fn read_with_status(&mut self, buf: &mut [u8]) -> io::Result<(usize, Status)> {
+        // Flush the output buffer before reading.
+        self.inner.flush()?;
+
+        self.inner.read_with_status(buf)
+    }
+
+    #[inline]
+    fn read_vectored_with_status(
+        &mut self,
+        bufs: &mut [IoSliceMut<'_>],
+    ) -> io::Result<(usize, Status)> {
+        // Flush the output buffer before reading.
+        self.inner.flush()?;
+
+        self.inner.read_vectored_with_status(bufs)
+    }
+}
+
+impl<RW: ReadExt + WriteExt> ReadExt for BufReaderLineWriterBackend<RW> {
+    #[inline]
+    fn read_with_status(&mut self, buf: &mut [u8]) -> io::Result<(usize, Status)> {
+        self.inner.read_with_status(buf)
+    }
+
+    #[inline]
+    fn read_vectored_with_status(
+        &mut self,
+        bufs: &mut [IoSliceMut<'_>],
+    ) -> io::Result<(usize, Status)> {
+        self.inner.read_vectored_with_status(bufs)
+    }
+}
+
+impl<RW: io::Read + io::Write> io::Read for BufReaderLineWriter<RW> {
+    #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        // Flush the output buffer before reading.
+        self.inner.flush()?;
+
+        self.inner.read(buf)
+    }
+
+    #[inline]
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        // Flush the output buffer before reading.
+        self.inner.flush()?;
+
+        self.inner.read_vectored(bufs)
+    }
+
+    #[cfg(feature = "nightly")]
+    #[inline]
+    fn is_read_vectored(&self) -> bool {
+        self.inner.is_read_vectored()
+    }
+
+    #[cfg(feature = "nightly")]
+    #[inline]
+    unsafe fn initializer(&self) -> Initializer {
+        self.inner.initializer()
+    }
+}
+
+impl<RW: io::Read + io::Write> io::Read for BufReaderLineWriterBackend<RW> {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf)
@@ -257,7 +439,35 @@ impl<RW: ReadWrite> Read for BufReaderLineWriter<RW> {
     }
 }
 
-impl<RW: ReadWrite> BufRead for BufReaderLineWriter<RW> {
+impl<RW: io::Read + io::Write> BufRead for BufReaderLineWriter<RW> {
+    #[inline]
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        self.inner.fill_buf()
+    }
+
+    #[inline]
+    fn consume(&mut self, amt: usize) {
+        self.inner.consume(amt)
+    }
+
+    #[inline]
+    fn read_until(&mut self, byte: u8, buf: &mut Vec<u8>) -> io::Result<usize> {
+        // Flush the output buffer before reading.
+        self.flush()?;
+
+        self.inner.read_until(byte, buf)
+    }
+
+    #[inline]
+    fn read_line(&mut self, buf: &mut String) -> io::Result<usize> {
+        // Flush the output buffer before reading.
+        self.flush()?;
+
+        self.inner.read_line(buf)
+    }
+}
+
+impl<RW: io::Read + io::Write> BufRead for BufReaderLineWriterBackend<RW> {
     #[inline]
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         self.inner.fill_buf()
@@ -269,7 +479,16 @@ impl<RW: ReadWrite> BufRead for BufReaderLineWriter<RW> {
     }
 }
 
-impl<RW: ReadWrite> fmt::Debug for BufReaderLineWriter<RW>
+impl<RW: io::Read + io::Write> fmt::Debug for BufReaderLineWriter<RW>
+where
+    RW: fmt::Debug,
+{
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.inner.fmt(fmt)
+    }
+}
+
+impl<RW: io::Read + io::Write> fmt::Debug for BufReaderLineWriterBackend<RW>
 where
     RW: fmt::Debug,
 {

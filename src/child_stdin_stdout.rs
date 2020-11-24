@@ -1,27 +1,44 @@
 //! Define `ChildStdinStdout`, an interactive stream object formed by
 //! combining a child process' stdin and stdout.
 
-use std::process::{Child, ChildStdin, ChildStdout};
+use io_ext::{ReadExt, Status, WriteExt};
+use io_ext_adapters::{StdReader, StdWriter};
 use std::{
     fmt::Arguments,
-    io::{self, IoSlice, IoSliceMut, Read, Write},
+    io::{self, IoSlice, IoSliceMut},
+    process::{Child, ChildStdin, ChildStdout},
 };
 
 /// A child's (stdin, stdout) pair which can implement the `ReadWrite` trait.
 pub(crate) struct ChildStdinStdout {
-    stdout: ChildStdout,
-    stdin: ChildStdin,
+    stdout: StdReader<ChildStdout>,
+    stdin: StdWriter<ChildStdin>,
 }
 
 impl ChildStdinStdout {
     pub(crate) fn new(mut child: Child) -> Option<Self> {
-        let stdout = child.stdout.take()?;
-        let stdin = child.stdin.take()?;
+        let stdout = StdReader::new(child.stdout.take()?);
+        let stdin = StdWriter::new(child.stdin.take()?);
         Some(Self { stdin, stdout })
     }
 }
 
-impl Read for ChildStdinStdout {
+impl ReadExt for ChildStdinStdout {
+    #[inline]
+    fn read_with_status(&mut self, buf: &mut [u8]) -> io::Result<(usize, Status)> {
+        self.stdout.read_with_status(buf)
+    }
+
+    #[inline]
+    fn read_vectored_with_status(
+        &mut self,
+        bufs: &mut [IoSliceMut<'_>],
+    ) -> io::Result<(usize, Status)> {
+        self.stdout.read_vectored_with_status(bufs)
+    }
+}
+
+impl io::Read for ChildStdinStdout {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.stdout.read(buf)
@@ -54,7 +71,24 @@ impl Read for ChildStdinStdout {
     }
 }
 
-impl Write for ChildStdinStdout {
+impl WriteExt for ChildStdinStdout {
+    #[inline]
+    fn flush_with_status(&mut self, status: Status) -> io::Result<()> {
+        self.stdin.flush_with_status(status)
+    }
+
+    #[inline]
+    fn abandon(&mut self) {
+        self.stdin.abandon()
+    }
+
+    #[inline]
+    fn write_str(&mut self, buf: &str) -> io::Result<()> {
+        self.stdin.write_str(buf)
+    }
+}
+
+impl io::Write for ChildStdinStdout {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.stdin.write(buf)

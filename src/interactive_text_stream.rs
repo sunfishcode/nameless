@@ -1,10 +1,8 @@
-use crate::{stdin_stdout::StdinStdout, Pseudonym};
+use crate::{stdin_stdout::StdinStdout, InteractiveByteStream, Pseudonym};
 use anyhow::anyhow;
-use io_ext::{
-    default_read, default_read_exact, default_read_to_end, default_read_to_string,
-    default_read_vectored, ReadExt, ReadWriteExt, Status, WriteExt,
-};
+use io_ext::{ReadExt, Status, WriteExt};
 use io_ext_adapters::StdReaderWriter;
+use plain_text::TextReaderWriter;
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::{
@@ -18,10 +16,10 @@ use url::Url;
 #[cfg(not(windows))]
 use {crate::path_to_name::path_to_name, std::fs::OpenOptions};
 
-/// An `InteractiveByteStream` implements `Read` and `Write` as is meant
+/// An `InteractiveTextStream` implements `Read` and `Write` as is meant
 /// to be used with interactive streams.
 ///
-/// The primary way to construct an `InteractiveByteStream` is to use it as
+/// The primary way to construct an `InteractiveTextStream` is to use it as
 /// a type in a `StructOpt` struct. Command-line arguments will then
 /// be automatically converted into input streams. Currently supported
 /// syntaxes include:
@@ -32,19 +30,19 @@ use {crate::path_to_name::path_to_name, std::fs::OpenOptions};
 ///  - "-" is interpreted as the pair (stdin, stdout).
 ///  - "(...)" runs a command with pipes to and from the child process'
 ///    (stdin, stdout), on platforms whch support it.
-pub struct InteractiveByteStream {
-    name: String,
-    reader_writer: Box<dyn ReadWriteExt>,
+pub struct InteractiveTextStream {
+    inner: InteractiveByteStream,
 }
 
-impl InteractiveByteStream {
+impl InteractiveTextStream {
     /// Return a `Pseudonym` which encapsulates this stream's name (typically
     /// its filesystem path or its URL). This allows it to be written to an
-    /// `OutputByteStream` while otherwise remaining entirely opaque.
+    /// `OutputTextStream` while otherwise remaining entirely opaque.
     pub fn pseudonym(&self) -> Pseudonym {
-        Pseudonym::new(self.name.clone())
+        self.inner.pseudonym()
     }
 
+    /// FIXME: dedup some of this with bytestream?
     fn from_str(s: &str) -> Result<Self, anyhow::Error> {
         // If we can parse it as a URL, treat it as such.
         if let Ok(url) = Url::parse(s) {
@@ -66,20 +64,15 @@ impl InteractiveByteStream {
         Self::from_path(Path::new(s))
     }
 
-    pub(crate) fn from_reader_writer(name: String, reader_writer: Box<dyn ReadWriteExt>) -> Self {
-        Self {
-            name,
-            reader_writer,
-        }
-    }
-
     /// Return an interactive byte stream representing standard input and standard output.
     pub fn stdin_stdout() -> anyhow::Result<Self> {
+        let reader_writer = StdinStdout::new()
+            .ok_or_else(|| anyhow!("attempted to open stdin or stdout multiple times"))?;
+        let reader_writer = TextReaderWriter::new(reader_writer);
         Ok(Self {
-            name: "-".to_owned(),
-            reader_writer: Box::new(
-                StdinStdout::new()
-                    .ok_or_else(|| anyhow!("attempted to open stdin or stdout multiple times"))?,
+            inner: InteractiveByteStream::from_reader_writer(
+                "-".to_owned(),
+                Box::new(reader_writer),
             ),
         })
     }
@@ -117,10 +110,10 @@ impl InteractiveByteStream {
 
             let stream = TcpStream::connect(format!("{}:{}", host_str, port))?;
             let stream = StdReaderWriter::new(stream);
+            let stream = TextReaderWriter::new(stream);
 
             return Ok(Self {
-                name: url.to_string(),
-                reader_writer: Box::new(stream),
+                inner: InteractiveByteStream::from_reader_writer(url.to_string(), Box::new(stream)),
             });
         }
 
@@ -134,10 +127,10 @@ impl InteractiveByteStream {
 
             let stream = UnixStream::connect(url.path())?;
             let stream = StdReaderWriter::new(stream);
+            let stream = TextReaderWriter::new(stream);
 
             return Ok(Self {
-                name: url.to_string(),
-                reader_writer: Box::new(stream),
+                inner: InteractiveByteStream::from_reader_writer(url.to_string(), Box::new(stream)),
             });
         }
 
@@ -168,10 +161,13 @@ impl InteractiveByteStream {
 
             let (stream, addr) = listener.accept()?;
             let stream = StdReaderWriter::new(stream);
+            let stream = TextReaderWriter::new(stream);
 
             return Ok(Self {
-                name: format!("accept://{}", addr),
-                reader_writer: Box::new(stream),
+                inner: InteractiveByteStream::from_reader_writer(
+                    format!("accept://{}", addr),
+                    Box::new(stream),
+                ),
             });
         }
 
@@ -187,12 +183,12 @@ impl InteractiveByteStream {
 
             let (stream, addr) = listener.accept()?;
             let stream = StdReaderWriter::new(stream);
+            let stream = TextReaderWriter::new(stream);
 
             let name = path_to_name("accept", addr.as_pathname().unwrap())?;
 
             return Ok(Self {
-                name,
-                reader_writer: Box::new(stream),
+                inner: InteractiveByteStream::from_reader_writer(name, Box::new(stream)),
             });
         }
 
@@ -219,9 +215,10 @@ impl InteractiveByteStream {
                 "path to interactive channel must be a character device"
             ));
         }
+        let reader_writer = StdReaderWriter::new(file);
+        let reader_writer = TextReaderWriter::new(reader_writer);
         Ok(Self {
-            name,
-            reader_writer: Box::new(StdReaderWriter::new(file)),
+            inner: InteractiveByteStream::from_reader_writer(name, Box::new(reader_writer)),
         })
     }
 
@@ -245,22 +242,21 @@ impl InteractiveByteStream {
             .ok_or_else(|| anyhow!("child stream specified with '(...)' must contain a command"))?;
         let mut command = std::process::Command::new(first);
         command.args(rest);
+        let reader_writer = crate::command_stdin_stdout::CommandStdinStdout::new(command);
+        let reader_writer = TextReaderWriter::new(reader_writer);
         Ok(Self {
-            name: s.to_owned(),
-            reader_writer: Box::new(crate::command_stdin_stdout::CommandStdinStdout::new(
-                command,
-            )),
+            inner: InteractiveByteStream::from_reader_writer(s.to_owned(), Box::new(reader_writer)),
         })
     }
 }
 
-/// Implement `FromStr` so that `structopt` can parse `InteractiveByteStream`
+/// Implement `FromStr` so that `structopt` can parse `InteractiveTextStream`
 /// arguments automatically. For now, hide this from the documentation as it's
 /// not clear if we want to commit to this approach. Two potential concerns:
 ///  - This uses `str` so it only handles well-formed Unicode paths.
 ///  - Opening resources from strings depends on ambient authorities.
 #[doc(hidden)]
-impl FromStr for InteractiveByteStream {
+impl FromStr for InteractiveTextStream {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self> {
@@ -268,10 +264,10 @@ impl FromStr for InteractiveByteStream {
     }
 }
 
-impl ReadExt for InteractiveByteStream {
+impl ReadExt for InteractiveTextStream {
     #[inline]
     fn read_with_status(&mut self, buf: &mut [u8]) -> io::Result<(usize, Status)> {
-        self.reader_writer.read_with_status(buf)
+        self.inner.read_with_status(buf)
     }
 
     #[inline]
@@ -279,103 +275,104 @@ impl ReadExt for InteractiveByteStream {
         &mut self,
         bufs: &mut [IoSliceMut<'_>],
     ) -> io::Result<(usize, Status)> {
-        self.reader_writer.read_vectored_with_status(bufs)
+        self.inner.read_vectored_with_status(bufs)
     }
 }
 
-impl io::Read for InteractiveByteStream {
+impl io::Read for InteractiveTextStream {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        default_read(self, buf)
+        self.inner.read(buf)
     }
 
     #[inline]
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        default_read_vectored(self, bufs)
+        self.inner.read_vectored(bufs)
     }
 
     #[cfg(feature = "nightly")]
     #[inline]
     fn is_read_vectored(&self) -> bool {
-        self.reader_writer.is_read_vectored()
+        self.inner.is_read_vectored()
     }
 
     #[inline]
     fn read_to_end(&mut self, buf: &mut Vec<u8>) -> io::Result<usize> {
-        default_read_to_end(self, buf)
+        self.inner.read_to_end(buf)
     }
 
     #[inline]
     fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
-        default_read_to_string(self, buf)
+        self.inner.read_to_string(buf)
     }
 
     #[inline]
     fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
-        default_read_exact(self, buf)
+        self.inner.read_exact(buf)
     }
 }
 
-impl WriteExt for InteractiveByteStream {
+impl WriteExt for InteractiveTextStream {
     #[inline]
     fn flush_with_status(&mut self, status: Status) -> io::Result<()> {
-        self.reader_writer.flush_with_status(status)
+        self.inner.flush_with_status(status)
     }
 
     #[inline]
     fn abandon(&mut self) {
-        self.reader_writer.abandon()
+        self.inner.abandon()
     }
 
     #[inline]
     fn write_str(&mut self, buf: &str) -> io::Result<()> {
-        self.reader_writer.write_str(buf)
+        self.inner.write_str(buf)
     }
 }
 
-impl io::Write for InteractiveByteStream {
+impl io::Write for InteractiveTextStream {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.reader_writer.write(buf)
+        self.inner.write(buf)
     }
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        self.reader_writer.flush()
+        self.inner.flush()
     }
 
     #[inline]
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.reader_writer.write_vectored(bufs)
+        self.inner.write_vectored(bufs)
     }
 
     #[cfg(feature = "nightly")]
     #[inline]
     fn is_write_vectored(&self) -> bool {
-        self.reader_writer.is_write_vectored()
+        self.inner.is_write_vectored()
     }
 
     #[inline]
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        self.reader_writer.write_all(buf)
+        self.inner.write_all(buf)
     }
 
     #[cfg(feature = "nightly")]
     #[inline]
     fn write_all_vectored(&mut self, bufs: &mut [IoSlice<'_>]) -> io::Result<()> {
-        self.reader_writer.write_all_vectored(bufs)
+        self.inner.write_all_vectored(bufs)
     }
 
     #[inline]
     fn write_fmt(&mut self, fmt: Arguments<'_>) -> io::Result<()> {
-        self.reader_writer.write_fmt(fmt)
+        self.inner.write_fmt(fmt)
     }
 }
 
-impl Debug for InteractiveByteStream {
+impl Debug for InteractiveTextStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // Don't print the name here, as that's an implementation detail.
-        let mut b = f.debug_struct("InteractiveByteStream");
+        let mut b = f.debug_struct("InteractiveTextStream");
+        b.field("inner", &self.inner);
         b.finish()
     }
 }

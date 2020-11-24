@@ -4,10 +4,11 @@
 //! and expect to be able to harmlessly discard the results.
 
 use crate::child_stdin_stdout::ChildStdinStdout;
-use std::process::{Command, Stdio};
+use io_ext::{ReadExt, Status, WriteExt};
 use std::{
     fmt::Arguments,
-    io::{self, IoSlice, IoSliceMut, Read, Write},
+    io::{self, IoSlice, IoSliceMut},
+    process::{Command, Stdio},
 };
 
 /// A child's (stdin, stdout) pair which can implement the `ReadWrite` trait.
@@ -37,7 +38,22 @@ impl CommandStdinStdout {
     }
 }
 
-impl Read for CommandStdinStdout {
+impl ReadExt for CommandStdinStdout {
+    #[inline]
+    fn read_with_status(&mut self, buf: &mut [u8]) -> io::Result<(usize, Status)> {
+        self.child()?.read_with_status(buf)
+    }
+
+    #[inline]
+    fn read_vectored_with_status(
+        &mut self,
+        bufs: &mut [IoSliceMut<'_>],
+    ) -> io::Result<(usize, Status)> {
+        self.child()?.read_vectored_with_status(bufs)
+    }
+}
+
+impl io::Read for CommandStdinStdout {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.child()?.read(buf)
@@ -70,7 +86,26 @@ impl Read for CommandStdinStdout {
     }
 }
 
-impl Write for CommandStdinStdout {
+impl WriteExt for CommandStdinStdout {
+    #[inline]
+    fn flush_with_status(&mut self, status: Status) -> io::Result<()> {
+        self.child()?.flush_with_status(status)
+    }
+
+    #[inline]
+    fn abandon(&mut self) {
+        if let Ok(c) = self.child() {
+            c.abandon()
+        }
+    }
+
+    #[inline]
+    fn write_str(&mut self, buf: &str) -> io::Result<()> {
+        self.child()?.write_str(buf)
+    }
+}
+
+impl io::Write for CommandStdinStdout {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.child()?.write(buf)

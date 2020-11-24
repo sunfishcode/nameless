@@ -1,29 +1,40 @@
-use crate::{path_to_name::path_to_name, Pseudonym, Type};
+#[cfg(unix)]
+use crate::summon_bat::summon_bat;
+use crate::{path_to_name::path_to_name, OutputByteStream, Pseudonym, Type};
 use anyhow::anyhow;
 use flate2::{write::GzEncoder, Compression};
-use io_ext::{Status, WriteExt};
+use io_ext::{default_flush, Status, WriteExt};
 use io_ext_adapters::StdWriter;
+use plain_text::TextWriter;
 use raw_stdio::RawStdout;
+#[cfg(all(not(unix), not(windows)))]
+use std::os::unix::io::AsRawFd;
+#[cfg(unix)]
+use std::os::unix::io::FromRawFd;
+#[cfg(windows)]
+use std::os::windows::io::{AsRawHandle, FromRawHandle};
 use std::{
     fmt::{self, Arguments, Debug, Formatter},
     fs::File,
     io::{self, IoSlice},
     path::Path,
+    process::{exit, Child},
     str::FromStr,
 };
+use terminal_color_support::{detect_terminal_color_support, ColorWriter};
 use url::Url;
 
-/// An output stream for binary output.
+/// An output stream for plain text output.
 ///
-/// An `OutputByteStream` implements `Write` so it supports `write`,
+/// An `OutputTextStream` implements `Write` so it supports `write`,
 /// `write_all`, etc. and can be used anywhere a `Write`-implementing
 /// object is needed.
 ///
-/// `OutputByteStream` is unbuffered (even when it is stdout), so wrapping
+/// `OutputTextStream` is unbuffered (even when it is stdout), so wrapping
 /// it in a [`std::io::BufWriter`] or [`std::io::LineWriter`] is
 /// recommended for performance.
 ///
-/// The primary way to construct an `OutputByteStream` is to use it as
+/// The primary way to construct an `OutputTextStream` is to use it as
 /// a type in a `StructOpt` struct. Command-line arguments will then
 /// be automatically converted into output streams. Currently supported
 /// syntaxes include:
@@ -36,35 +47,35 @@ use url::Url;
 ///    filesystem paths. To force a string to be interpreted as a plain
 ///    local path, arrange for it to begin with `./` or `/`.
 ///
-/// Programs using `OutputByteStream` as an argument should avoid using
+/// Programs using `OutputTextStream` as an argument should avoid using
 /// `std::io::stdout`, `std::println`, or anything else which uses standard
 /// output implicitly.
-pub struct OutputByteStream {
-    name: String,
-    writer: Box<dyn WriteExt>,
-    type_: Type,
+pub struct OutputTextStream {
+    inner: OutputByteStream,
+    stdout_helper_child: Option<Child>,
 }
 
-impl OutputByteStream {
+impl OutputTextStream {
     /// Write the given `Pseudonym` to the output stream.
     pub fn write_pseudonym(&mut self, pseudonym: &Pseudonym) -> io::Result<()> {
-        io::Write::write_all(self, pseudonym.name.as_bytes())
+        self.inner.write_pseudonym(pseudonym)
     }
 
     /// Write the name of the given output stream to the output stream. This is
-    /// needed because the name of an `OutputByteStream` is not available in
+    /// needed because the name of an `OutputTextStream` is not available in
     /// the public API.
     pub fn pseudonym(&self) -> Pseudonym {
-        Pseudonym::new(self.name.clone())
+        self.inner.pseudonym()
     }
 
     /// If the output stream metadata implies a particular media type, also
-    /// known as MIME type, return it. Some output streams know their type,
-    /// though many do not.
+    /// known as MIME type, return it. Otherwise default to
+    /// "text/plain; charset=utf-8".
     pub fn type_(&self) -> &Type {
-        &self.type_
+        self.inner.type_()
     }
 
+    /// FIXME: dedup some of this with bytestream?
     fn from_str(s: &str) -> Result<Self, anyhow::Error> {
         // If we can parse it as a URL, treat it as such.
         if let Ok(url) = Url::parse(s) {
@@ -73,7 +84,7 @@ impl OutputByteStream {
 
         // Special-case "-" to mean stdout.
         if s == "-" {
-            return Self::stdout(Type::unknown());
+            return Self::stdout(Type::text());
         }
 
         // Strings beginning with "$(" are commands.
@@ -86,33 +97,32 @@ impl OutputByteStream {
         Self::from_path(Path::new(s))
     }
 
-    pub(crate) fn from_writer(name: String, writer: Box<dyn WriteExt>, type_: Type) -> Self {
-        Self {
-            name,
-            writer,
-            type_,
-        }
-    }
-
     /// Return an output byte stream representing standard output.
     pub fn stdout(type_: Type) -> anyhow::Result<Self> {
+        #[cfg(unix)]
+        let (_isatty, color_support, stdout_helper_child) = summon_bat(&type_)?;
+
         let stdout =
             RawStdout::new().ok_or_else(|| anyhow!("attempted to open stdout multiple times"))?;
 
-        #[cfg(not(windows))]
-        if posish::io::isatty(&stdout) {
-            return Err(anyhow!("attempted to write binary output to a terminal"));
-        }
+        #[cfg(all(not(unix), not(windows)))]
+        let (_isatty, color_support) =
+            detect_terminal_color_support(&std::mem::ManuallyDrop::new(unsafe {
+                File::from_raw_fd(stdout.as_raw_fd())
+            }));
 
         #[cfg(windows)]
-        if atty::is(atty::Stream::Stdout) {
-            return Err(anyhow!("attempted to write binary output to a terminal"));
-        }
+        let (_isatty, color_support) =
+            detect_terminal_color_support(&std::mem::ManuallyDrop::new(unsafe {
+                File::from_raw_handle(stdout.as_raw_handle())
+            }));
+
+        let stdout = TextWriter::new(stdout);
+        let stdout = ColorWriter::new(stdout, color_support);
 
         Ok(Self {
-            name: "-".to_owned(),
-            writer: Box::new(stdout),
-            type_,
+            inner: OutputByteStream::from_writer("-".to_owned(), Box::new(stdout), type_),
+            stdout_helper_child,
         })
     }
 
@@ -154,17 +164,22 @@ impl OutputByteStream {
             let path = path.with_extension("");
             let type_ = Type::from_extension(path.extension());
             // 6 is the default gzip compression level.
+            let writer = StdWriter::new(GzEncoder::new(file, Compression::new(6)));
+            let writer = TextWriter::new(writer);
             Ok(Self {
-                name,
-                writer: Box::new(StdWriter::new(GzEncoder::new(file, Compression::new(6)))),
-                type_,
+                inner: OutputByteStream::from_writer(name, Box::new(writer), type_),
+                stdout_helper_child: None,
             })
         } else {
             let type_ = Type::from_extension(path.extension());
+            // Even though we opened this from the filesystem, it might be a
+            // character device and might have color support.
+            let (_isatty, color_support) = detect_terminal_color_support(&file);
+            let writer = ColorWriter::new(StdWriter::new(file), color_support);
+            let writer = TextWriter::new(writer);
             Ok(Self {
-                name,
-                writer: Box::new(StdWriter::new(file)),
-                type_,
+                inner: OutputByteStream::from_writer(name, Box::new(writer), type_),
+                stdout_helper_child: None,
             })
         }
     }
@@ -185,21 +200,22 @@ impl OutputByteStream {
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
             .spawn()?;
+        let writer = StdWriter::new(child.stdin.unwrap());
+        let writer = TextWriter::new(writer);
         Ok(Self {
-            name: s.to_owned(),
-            writer: Box::new(StdWriter::new(child.stdin.unwrap())),
-            type_: Type::unknown(),
+            inner: OutputByteStream::from_writer(s.to_owned(), Box::new(writer), Type::unknown()),
+            stdout_helper_child: None,
         })
     }
 }
 
-/// Implement `From<&OsStr>` so that `structopt` can parse `OutputByteStream`
+/// Implement `From<&OsStr>` so that `structopt` can parse `OutputTextStream`
 /// objects automatically. For now, hide this from the documentation as it's
 /// not clear if we want to commit to this approach. Two potential concerns:
 ///  - This uses `str` so it only handles well-formed Unicode paths.
 ///  - Opening resources from strings depends on ambient authorities.
 #[doc(hidden)]
-impl FromStr for OutputByteStream {
+impl FromStr for OutputTextStream {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self> {
@@ -207,66 +223,116 @@ impl FromStr for OutputByteStream {
     }
 }
 
-impl WriteExt for OutputByteStream {
+impl WriteExt for OutputTextStream {
     #[inline]
     fn flush_with_status(&mut self, status: Status) -> io::Result<()> {
-        self.writer.flush_with_status(status)
+        self.inner.flush_with_status(status)?;
+
+        if let Status::End = status {
+            if let Some(mut stdout_helper_child) = self.stdout_helper_child.take() {
+                // Close standard output, prompting the child process to exit.
+                close_stdout();
+
+                stdout_helper_child.wait()?;
+            }
+        }
+
+        Ok(())
     }
 
     #[inline]
     fn abandon(&mut self) {
-        self.writer.abandon()
+        self.inner.abandon()
     }
 
     #[inline]
     fn write_str(&mut self, buf: &str) -> io::Result<()> {
-        self.writer.write_str(buf)
+        self.inner.write_str(buf)
     }
 }
 
-impl io::Write for OutputByteStream {
+impl io::Write for OutputTextStream {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.writer.write(buf)
+        self.inner.write(buf)
     }
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        self.writer.flush()
+        default_flush(self)
     }
 
     #[inline]
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.writer.write_vectored(bufs)
+        self.inner.write_vectored(bufs)
     }
 
     #[cfg(feature = "nightly")]
     #[inline]
     fn is_write_vectored(&self) -> bool {
-        self.writer.is_write_vectored()
+        self.inner.is_write_vectored()
     }
 
     #[inline]
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        self.writer.write_all(buf)
+        self.inner.write_all(buf)
     }
 
     #[cfg(feature = "nightly")]
     #[inline]
     fn write_all_vectored(&mut self, bufs: &mut [IoSlice<'_>]) -> io::Result<()> {
-        self.writer.write_all_vectored(bufs)
+        self.inner.write_all_vectored(bufs)
     }
 
     #[inline]
     fn write_fmt(&mut self, fmt: Arguments<'_>) -> io::Result<()> {
-        self.writer.write_fmt(fmt)
+        self.inner.write_fmt(fmt)
     }
 }
 
-impl Debug for OutputByteStream {
+impl Drop for OutputTextStream {
+    fn drop(&mut self) {
+        if let Some(mut stdout_helper_child) = self.stdout_helper_child.take() {
+            // Wait for the child. We can't return `Err` from a `drop` function,
+            // so just print a message and return. Callers should use
+            // `flush_with_status(Status::End)` to declare the end of the stream
+            // if they wish to avoid these errors.
+
+            // Close standard output, prompting the child process to exit.
+            close_stdout();
+
+            match stdout_helper_child.wait() {
+                Ok(status) => {
+                    if !status.success() {
+                        eprintln!(
+                            "Output formatting process exited with non-success exit status: {:?}",
+                            status
+                        );
+                        exit(libc::EXIT_FAILURE);
+                    }
+                }
+
+                Err(e) => {
+                    eprintln!("Unable to wait for output formatting process: {:?}", e);
+                    exit(libc::EXIT_FAILURE);
+                }
+            }
+        }
+    }
+}
+
+impl Debug for OutputTextStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // Don't print the name here, as that's an implementation detail.
-        let mut b = f.debug_struct("OutputByteStream");
+        let mut b = f.debug_struct("OutputTextStream");
+        b.field("inner", &self.inner);
         b.finish()
     }
+}
+
+fn close_stdout() {
+    #[cfg(not(windows))]
+    let _ = unsafe { File::from_raw_fd(libc::STDOUT_FILENO) };
+    #[cfg(windows)]
+    let _ = unsafe { File::from_raw_handle(winapi::um::winbase::STD_OUTPUT_HANDLE) };
 }

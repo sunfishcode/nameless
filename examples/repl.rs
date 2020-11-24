@@ -1,4 +1,4 @@
-//! A simple REPL program using `kommand` and `InteractiveByteStream`.
+//! A simple REPL program using `kommand` and `InteractiveTextStream`.
 //!
 //! Run it interactively with the process' (stdin, stdout):
 //! ```
@@ -9,9 +9,9 @@
 //! [entered "world"]
 //! ```
 //!
-//! Run it piped to a child process:
+//! Run it piped to a client process:
 //! ```
-//! $ cargo run --quiet --example repl '$(cargo run --quiet --example repl-child -)'
+//! $ cargo run --quiet --example repl '$(cargo run --quiet --example repl-client -)'
 //! [entered "hello"]
 //! [entered "world"]
 //! ```
@@ -27,21 +27,21 @@
 //! ```
 //! $ cargo run --quiet --example repl accept://localhost:9999 &
 //! ...
-//! $ cargo run --quiet --example repl-child connect://localhost:9999
+//! $ cargo run --quiet --example repl-client connect://localhost:9999
 //! [entered "hello"]
 //! [entered "world"]
 //! ```
 
-use nameless::{BufReaderLineWriter, InteractiveByteStream};
+use nameless::{BufReaderLineWriter, InteractiveTextStream};
 use std::io::{BufRead, Write};
 
 #[kommand::main]
-fn main(io: InteractiveByteStream) -> anyhow::Result<()> {
+fn main(io: InteractiveTextStream) -> anyhow::Result<()> {
     let mut io = BufReaderLineWriter::new(io);
     let mut s = String::new();
 
     loop {
-        write!(io, "prompt> ")?;
+        write!(io, "prompt> \u{34f}")?;
 
         if io.read_line(&mut s)? == 0 {
             // End of stream. Tidy up the terminal and exit. Ignore broken-pipe
@@ -61,7 +61,7 @@ fn main(io: InteractiveByteStream) -> anyhow::Result<()> {
             return Ok(());
         }
 
-        eprintln!("[entered \"{}\"]", s.trim().escape_default());
+        writeln!(io, "[received \"{}\"]", s.trim().escape_default())?;
 
         s.clear();
     }

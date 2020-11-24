@@ -3,7 +3,7 @@
 
 use nameless::{InputTextStream, OutputTextStream, Type};
 use regex::Regex;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Write};
 
 #[rustfmt::skip] // TODO: rustfmt mishandles doc comments on arguments
 #[kommand::main]
@@ -22,17 +22,24 @@ fn main(
 
     let print_inputs = inputs.len() > 1;
 
-    for input in inputs {
+    'inputs: for input in inputs {
         let pseudonym = input.pseudonym();
         let reader = BufReader::new(input);
         for line in reader.lines() {
             let line = line?;
             if pattern.is_match(&line) {
-                if print_inputs {
-                    output.write_pseudonym(&pseudonym)?;
-                    write!(output, ":")?;
+                if let Err(e) = (|| -> io::Result<()> {
+                    if print_inputs {
+                        output.write_pseudonym(&pseudonym)?;
+                        write!(output, ":")?;
+                    }
+                    writeln!(output, "{}", line)
+                })() {
+                    match e.kind() {
+                        io::ErrorKind::BrokenPipe => break 'inputs,
+                        _ => return Err(e.into()),
+                    }
                 }
-                writeln!(output, "{}", line)?;
             }
         }
     }

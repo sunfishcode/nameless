@@ -1,18 +1,20 @@
-//! An example child program for the `repl` example. See the `repl` example
+//! An example client program for the `repl` example. See the `repl` example
 //! for details.
 
-use nameless::{BufReaderLineWriter, InteractiveByteStream};
-use std::io::{Read, Write};
-use std::str;
+use nameless::{BufReaderLineWriter, InteractiveTextStream};
+use std::{
+    io::{Read, Write},
+    str,
+};
 
 #[kommand::main]
-fn main(io: InteractiveByteStream) -> anyhow::Result<()> {
+fn main(io: InteractiveTextStream) -> anyhow::Result<()> {
     let mut io = BufReaderLineWriter::new(io);
-    let mut v = [0u8; 8];
+    let mut v = [0u8; 256];
 
     // Read the "prompt> ".
     let n = io.read(&mut v)?;
-    if &v[..n] != b"prompt> " {
+    if str::from_utf8(&v[..n]).unwrap() != "prompt> \u{34f}" {
         panic!("missed prompt");
     }
 
@@ -21,7 +23,7 @@ fn main(io: InteractiveByteStream) -> anyhow::Result<()> {
 
     // Read another "prompt> ".
     let n = io.read(&mut v)?;
-    if str::from_utf8(&v[..n]).unwrap() != "prompt> " {
+    if str::from_utf8(&v[..n]).unwrap() != "prompt> \u{34f}" {
         panic!(
             "missed second prompt: {:?}",
             String::from_utf8_lossy(&v[..n])
@@ -33,7 +35,7 @@ fn main(io: InteractiveByteStream) -> anyhow::Result<()> {
 
     // Read one more "prompt> ".
     let n = io.read(&mut v)?;
-    if &v[..n] != b"prompt> " {
+    if str::from_utf8(&v[..n]).unwrap() != "prompt> \u{34f}" {
         panic!("missed last prompt");
     }
 

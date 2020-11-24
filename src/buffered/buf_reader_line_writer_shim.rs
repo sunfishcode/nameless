@@ -1,9 +1,9 @@
 //! This file is derived from Rust's library/std/src/io/buffered at revision
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
-use super::BufReaderWriter;
-use crate::ReadWrite;
-use std::io::{self, IoSlice, Write};
+use super::buf_reader_writer::BufReaderWriterBackend;
+use io_ext::{Status, WriteExt};
+use std::io::{self, IoSlice};
 
 /// Private helper struct for implementing the line-buffered writing logic.
 /// This shim temporarily wraps a `BufReaderWriter`, and uses its internals to
@@ -15,13 +15,13 @@ use std::io::{self, IoSlice, Write};
 /// `BufReaderWriter`s to be temporarily given line-buffering logic; this is what
 /// enables Stdout to be alternately in line-buffered or block-buffered mode.
 #[derive(Debug)]
-pub(super) struct BufReaderLineWriterShim<'a, RW: ReadWrite> {
-    buffer: &'a mut BufReaderWriter<RW>,
+pub(super) struct BufReaderLineWriterShim<'a, RW: io::Read + io::Write> {
+    buffer: &'a mut BufReaderWriterBackend<RW>,
 }
 
-impl<'a, RW: ReadWrite> BufReaderLineWriterShim<'a, RW> {
+impl<'a, RW: io::Read + io::Write> BufReaderLineWriterShim<'a, RW> {
     #[inline]
-    pub fn new(buffer: &'a mut BufReaderWriter<RW>) -> Self {
+    pub fn new(buffer: &'a mut BufReaderWriterBackend<RW>) -> Self {
         Self { buffer }
     }
 
@@ -50,7 +50,50 @@ impl<'a, RW: ReadWrite> BufReaderLineWriterShim<'a, RW> {
     }
 }
 
-impl<'a, RW: ReadWrite> Write for BufReaderLineWriterShim<'a, RW> {
+impl<'a, RW: io::Read + WriteExt> WriteExt for BufReaderLineWriterShim<'a, RW> {
+    #[inline]
+    fn flush_with_status(&mut self, status: Status) -> io::Result<()> {
+        self.buffer.flush_with_status(status)
+    }
+
+    #[inline]
+    fn abandon(&mut self) {
+        self.buffer.abandon()
+    }
+
+    #[inline]
+    fn write_str(&mut self, buf: &str) -> io::Result<()> {
+        match memchr::memrchr(b'\n', buf.as_bytes()) {
+            // If there are no new newlines (that is, if this write is less than
+            // one line), just do a regular buffered write (which may flush if
+            // we exceed the inner buffer's size)
+            None => {
+                self.flush_if_completed_line()?;
+                self.buffer.write_str(buf)
+            }
+            Some(newline_idx) => {
+                let (lines, tail) = buf.split_at(newline_idx + 1);
+
+                if self.writer_buffered().is_empty() {
+                    self.inner_mut().write_str(lines)?;
+                } else {
+                    // If there is any buffered data, we add the incoming lines
+                    // to that buffer before flushing, which saves us at least
+                    // one write call. We can't really do this with `write`,
+                    // since we can't do this *and* not suppress errors *and*
+                    // report a consistent state to the caller in a return
+                    // value, but here in write_all it's fine.
+                    self.buffer.write_str(lines)?;
+                    self.buffer.flush_buf()?;
+                }
+
+                self.buffer.write_str(tail)
+            }
+        }
+    }
+}
+
+impl<'a, RW: io::Read + io::Write> io::Write for BufReaderLineWriterShim<'a, RW> {
     /// Write some data into this `BufReaderLineWriterShim` with line buffering. This means
     /// that, if any newlines are present in the data, the data up to the last
     /// newline is sent directly to the underlying writer, and data after it
