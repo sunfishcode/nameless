@@ -1,17 +1,26 @@
 use crate::{stdin_stdout::StdinStdout, InteractiveByteStream, Pseudonym};
 use anyhow::anyhow;
-use io_ext::{ReadExt, Status, WriteExt};
+use io_ext::{ReadExt, ReadWriteExt, Status, WriteExt};
 use io_ext_adapters::StdReaderWriter;
-use plain_text::TextReaderWriter;
 #[cfg(unix)]
-use std::os::unix::net::{UnixListener, UnixStream};
+use std::os::unix::{
+    io::FromRawFd,
+    net::{UnixListener, UnixStream},
+};
+#[cfg(windows)]
+use std::os::windows::io::FromRawHandle;
 use std::{
     fmt::{self, Arguments, Debug, Formatter},
+    fs::File,
     io::{self, IoSlice, IoSliceMut},
     net::{TcpListener, TcpStream},
     path::Path,
     str::FromStr,
 };
+use terminal_support::{
+    detect_terminal_color_support, ReadWriteTerminal, Terminal, TerminalColorSupport,
+};
+use text_streams::TextReaderWriter;
 use url::Url;
 #[cfg(not(windows))]
 use {crate::path_to_name::path_to_name, std::fs::OpenOptions};
@@ -32,6 +41,7 @@ use {crate::path_to_name::path_to_name, std::fs::OpenOptions};
 ///    (stdin, stdout), on platforms whch support it.
 pub struct InteractiveTextStream {
     inner: InteractiveByteStream,
+    color_support: TerminalColorSupport,
 }
 
 impl InteractiveTextStream {
@@ -68,12 +78,29 @@ impl InteractiveTextStream {
     pub fn stdin_stdout() -> anyhow::Result<Self> {
         let reader_writer = StdinStdout::new()
             .ok_or_else(|| anyhow!("attempted to open stdin or stdout multiple times"))?;
-        let reader_writer = TextReaderWriter::new(reader_writer);
+
+        #[cfg(not(windows))]
+        let (_isatty, color_support) =
+            detect_terminal_color_support(&std::mem::ManuallyDrop::new(unsafe {
+                File::from_raw_fd(reader_writer.stdout_as_raw_fd())
+            }));
+
+        #[cfg(windows)]
+        let (_isatty, color_support) =
+            detect_terminal_color_support(&std::mem::ManuallyDrop::new(unsafe {
+                File::from_raw_handle(reader_writer.stdout_as_raw_handle())
+            }));
+
+        let reader_writer = TextReaderWriter::with_ansi_color_output(
+            reader_writer,
+            color_support != TerminalColorSupport::Monochrome,
+        );
         Ok(Self {
             inner: InteractiveByteStream::from_reader_writer(
                 "-".to_owned(),
                 Box::new(reader_writer),
             ),
+            color_support,
         })
     }
 
@@ -114,6 +141,7 @@ impl InteractiveTextStream {
 
             return Ok(Self {
                 inner: InteractiveByteStream::from_reader_writer(url.to_string(), Box::new(stream)),
+                color_support: TerminalColorSupport::default(),
             });
         }
 
@@ -131,6 +159,7 @@ impl InteractiveTextStream {
 
             return Ok(Self {
                 inner: InteractiveByteStream::from_reader_writer(url.to_string(), Box::new(stream)),
+                color_support: TerminalColorSupport::default(),
             });
         }
 
@@ -168,6 +197,7 @@ impl InteractiveTextStream {
                     format!("accept://{}", addr),
                     Box::new(stream),
                 ),
+                color_support: TerminalColorSupport::default(),
             });
         }
 
@@ -189,6 +219,7 @@ impl InteractiveTextStream {
 
             return Ok(Self {
                 inner: InteractiveByteStream::from_reader_writer(name, Box::new(stream)),
+                color_support: TerminalColorSupport::default(),
             });
         }
 
@@ -215,10 +246,12 @@ impl InteractiveTextStream {
                 "path to interactive channel must be a character device"
             ));
         }
+        let (_isatty, color_support) = detect_terminal_color_support(&file);
         let reader_writer = StdReaderWriter::new(file);
         let reader_writer = TextReaderWriter::new(reader_writer);
         Ok(Self {
             inner: InteractiveByteStream::from_reader_writer(name, Box::new(reader_writer)),
+            color_support,
         })
     }
 
@@ -246,6 +279,7 @@ impl InteractiveTextStream {
         let reader_writer = TextReaderWriter::new(reader_writer);
         Ok(Self {
             inner: InteractiveByteStream::from_reader_writer(s.to_owned(), Box::new(reader_writer)),
+            color_support: TerminalColorSupport::default(),
         })
     }
 }
@@ -367,6 +401,15 @@ impl io::Write for InteractiveTextStream {
         self.inner.write_fmt(fmt)
     }
 }
+
+impl Terminal for InteractiveTextStream {
+    fn color_support(&self) -> TerminalColorSupport {
+        self.color_support
+    }
+}
+
+impl ReadWriteExt for InteractiveTextStream {}
+impl ReadWriteTerminal for InteractiveTextStream {}
 
 impl Debug for InteractiveTextStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

@@ -5,7 +5,6 @@ use flate2::read::GzDecoder;
 use io_ext::{ReadExt, Status};
 use io_ext_adapters::StdReader;
 use mime::Mime;
-use plain_text::TextReader;
 use raw_stdio::RawStdin;
 use std::{
     fmt::{self, Debug, Formatter},
@@ -14,6 +13,7 @@ use std::{
     path::Path,
     str::FromStr,
 };
+use text_streams::TextReader;
 use url::Url;
 
 /// In input stream for plain text input.
@@ -333,7 +333,7 @@ fn data_url_plain() {
         .unwrap()
         .read_to_string(&mut s)
         .unwrap();
-    assert_eq!(s, "Hello, World!");
+    assert_eq!(s, "Hello, World!\n");
 }
 
 #[test]
@@ -344,5 +344,5 @@ fn data_url_base64() {
         .unwrap()
         .read_to_string(&mut s)
         .unwrap();
-    assert_eq!(s, "Hello, World!");
+    assert_eq!(s, "Hello, World!\n");
 }

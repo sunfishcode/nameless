@@ -7,6 +7,7 @@ use std::{
     fmt,
     io::{self, BufRead, IoSlice, IoSliceMut, Write},
 };
+use terminal_support::{Terminal, TerminalColorSupport};
 
 /// Wraps a reader and writer and buffers input and output to and from it, flushing
 /// the writer whenever a newline (`0x0a`, `'\n'`) is detected on output.
@@ -463,7 +464,9 @@ impl<RW: io::Read + io::Write> BufRead for BufReaderLineWriter<RW> {
         // Flush the output buffer before reading.
         self.flush()?;
 
-        self.inner.read_line(buf)
+        let t = self.inner.read_line(buf)?;
+
+        Ok(t)
     }
 }
 
@@ -476,6 +479,20 @@ impl<RW: io::Read + io::Write> BufRead for BufReaderLineWriterBackend<RW> {
     #[inline]
     fn consume(&mut self, amt: usize) {
         self.inner.consume(amt)
+    }
+}
+
+impl<RW: io::Read + io::Write + Terminal> Terminal for BufReaderLineWriterBackend<RW> {
+    #[inline]
+    fn color_support(&self) -> TerminalColorSupport {
+        self.inner.color_support()
+    }
+}
+
+impl<RW: io::Read + io::Write + Terminal> Terminal for BufReaderLineWriter<RW> {
+    #[inline]
+    fn color_support(&self) -> TerminalColorSupport {
+        self.inner.color_support()
     }
 }
 

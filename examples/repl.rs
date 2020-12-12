@@ -33,27 +33,38 @@
 //! ```
 
 use nameless::{BufReaderLineWriter, InteractiveTextStream};
-use std::io::{BufRead, Write};
+use std::io::{self, BufRead, Write};
+use terminal_support::{Terminal, TerminalColorSupport};
 
 #[kommand::main]
 fn main(io: InteractiveTextStream) -> anyhow::Result<()> {
-    let mut io = BufReaderLineWriter::new(io);
+    let io = BufReaderLineWriter::new(io);
+    let color =
+        io.color_support() != TerminalColorSupport::Monochrome && std::env::var("NOCOLOR").is_err();
+
+    match repl(io, color) {
+        Ok(()) => Ok(()),
+        Err(e) => match e.kind() {
+            io::ErrorKind::BrokenPipe => Ok(()),
+            _ => Err(e.into()),
+        },
+    }
+}
+
+fn repl(mut io: BufReaderLineWriter<InteractiveTextStream>, color: bool) -> io::Result<()> {
     let mut s = String::new();
 
     loop {
-        write!(io, "prompt> \u{34f}")?;
+        if color {
+            write!(io, "\u{1b}[01;36mprompt>\u{1b}[0m \u{34f}")?;
+        } else {
+            write!(io, "prompt> \u{34f}")?;
+        }
 
         if io.read_line(&mut s)? == 0 {
-            // End of stream. Tidy up the terminal and exit. Ignore broken-pipe
-            // errors because the input is closed, so the output may well be
-            // closed too.
-            match writeln!(io) {
-                Ok(()) => {}
-                Err(e) => match e.kind() {
-                    std::io::ErrorKind::BrokenPipe => {} // ignore
-                    _ => return Err(e.into()),
-                },
-            }
+            // Tidy up the terminal.
+            write!(io, "\n")?;
+            // End of stream.
             return Ok(());
         }
 
@@ -61,6 +72,7 @@ fn main(io: InteractiveTextStream) -> anyhow::Result<()> {
             return Ok(());
         }
 
+        eprintln!("[logging \"{}\"]", s.trim().escape_default());
         writeln!(io, "[received \"{}\"]", s.trim().escape_default())?;
 
         s.clear();

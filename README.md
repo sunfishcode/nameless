@@ -52,11 +52,11 @@ deterministic-build environments.
 [`gumdrop`]: https://crates.io/crates/gumdrop
 [`paw`]: https://crates.io/crates/paw
 [`kommand`]: https://crates.io/crates/kommand
-[`BufReader`]: https://doc.rust-lang.org/stable/std/io/struct.BufReader.html
-[`BufWriter`]: https://doc.rust-lang.org/stable/std/io/struct.BufWriter.html
-[`LineWriter`]: https://doc.rust-lang.org/stable/std/io/struct.LineWriter.html
-[`Read`]: https://doc.rust-lang.org/stable/std/io/trait.Read.html
-[`Write`]: https://doc.rust-lang.org/stable/std/io/trait.Write.html
+[`BufReader`]: https://doc.rust-lang.org/std/io/struct.BufReader.html
+[`BufWriter`]: https://doc.rust-lang.org/std/io/struct.BufWriter.html
+[`LineWriter`]: https://doc.rust-lang.org/std/io/struct.LineWriter.html
+[`Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
+[`Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
 
 ## Example
 

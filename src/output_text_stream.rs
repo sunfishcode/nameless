@@ -5,12 +5,9 @@ use anyhow::anyhow;
 use flate2::{write::GzEncoder, Compression};
 use io_ext::{default_flush, Status, WriteExt};
 use io_ext_adapters::StdWriter;
-use plain_text::TextWriter;
 use raw_stdio::RawStdout;
 #[cfg(all(not(unix), not(windows)))]
-use std::os::unix::io::AsRawFd;
-#[cfg(unix)]
-use std::os::unix::io::FromRawFd;
+use std::os::unix::io::{AsRawFd, FromRawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawHandle, FromRawHandle};
 use std::{
@@ -21,7 +18,8 @@ use std::{
     process::{exit, Child},
     str::FromStr,
 };
-use terminal_color_support::{detect_terminal_color_support, ColorWriter};
+use terminal_support::{detect_terminal_color_support, Terminal, TerminalColorSupport};
+use text_streams::TextWriter;
 use url::Url;
 
 /// An output stream for plain text output.
@@ -52,7 +50,8 @@ use url::Url;
 /// output implicitly.
 pub struct OutputTextStream {
     inner: OutputByteStream,
-    stdout_helper_child: Option<Child>,
+    stdout_helper_child: Option<(Child, RawStdout)>,
+    color_support: TerminalColorSupport,
 }
 
 impl OutputTextStream {
@@ -99,11 +98,29 @@ impl OutputTextStream {
 
     /// Return an output byte stream representing standard output.
     pub fn stdout(type_: Type) -> anyhow::Result<Self> {
-        #[cfg(unix)]
-        let (_isatty, color_support, stdout_helper_child) = summon_bat(&type_)?;
-
         let stdout =
             RawStdout::new().ok_or_else(|| anyhow!("attempted to open stdout multiple times"))?;
+
+        #[cfg(unix)]
+        let color_support = {
+            let (_isatty, color_support, stdout_helper_child) = summon_bat(&stdout, &type_)?;
+
+            if let Some(mut stdout_helper_child) = stdout_helper_child {
+                let output = StdWriter::new(stdout_helper_child.stdin.take().unwrap());
+                let output = TextWriter::with_ansi_color(
+                    output,
+                    color_support != TerminalColorSupport::Monochrome,
+                );
+
+                return Ok(Self {
+                    inner: OutputByteStream::from_writer("-".to_owned(), Box::new(output), type_),
+                    stdout_helper_child: Some((stdout_helper_child, stdout)),
+                    color_support,
+                });
+            }
+
+            color_support
+        };
 
         #[cfg(all(not(unix), not(windows)))]
         let (_isatty, color_support) =
@@ -117,12 +134,13 @@ impl OutputTextStream {
                 File::from_raw_handle(stdout.as_raw_handle())
             }));
 
-        let stdout = TextWriter::new(stdout);
-        let stdout = ColorWriter::new(stdout, color_support);
+        let stdout =
+            TextWriter::with_ansi_color(stdout, color_support != TerminalColorSupport::Monochrome);
 
         Ok(Self {
             inner: OutputByteStream::from_writer("-".to_owned(), Box::new(stdout), type_),
-            stdout_helper_child,
+            stdout_helper_child: None,
+            color_support,
         })
     }
 
@@ -169,17 +187,22 @@ impl OutputTextStream {
             Ok(Self {
                 inner: OutputByteStream::from_writer(name, Box::new(writer), type_),
                 stdout_helper_child: None,
+                color_support: TerminalColorSupport::default(),
             })
         } else {
             let type_ = Type::from_extension(path.extension());
             // Even though we opened this from the filesystem, it might be a
             // character device and might have color support.
             let (_isatty, color_support) = detect_terminal_color_support(&file);
-            let writer = ColorWriter::new(StdWriter::new(file), color_support);
-            let writer = TextWriter::new(writer);
+            let writer = StdWriter::new(file);
+            let writer = TextWriter::with_ansi_color(
+                writer,
+                color_support != TerminalColorSupport::Monochrome,
+            );
             Ok(Self {
                 inner: OutputByteStream::from_writer(name, Box::new(writer), type_),
                 stdout_helper_child: None,
+                color_support,
             })
         }
     }
@@ -205,6 +228,7 @@ impl OutputTextStream {
         Ok(Self {
             inner: OutputByteStream::from_writer(s.to_owned(), Box::new(writer), Type::unknown()),
             stdout_helper_child: None,
+            color_support: TerminalColorSupport::default(),
         })
     }
 }
@@ -229,9 +253,13 @@ impl WriteExt for OutputTextStream {
         self.inner.flush_with_status(status)?;
 
         if let Status::End = status {
-            if let Some(mut stdout_helper_child) = self.stdout_helper_child.take() {
+            if let Some((mut stdout_helper_child, _raw_stdout)) = self.stdout_helper_child.take() {
                 // Close standard output, prompting the child process to exit.
-                close_stdout();
+                self.inner = OutputByteStream::from_writer(
+                    "-".to_owned(),
+                    Box::new(Vec::new()),
+                    self.inner.type_().clone(),
+                );
 
                 stdout_helper_child.wait()?;
             }
@@ -290,16 +318,26 @@ impl io::Write for OutputTextStream {
     }
 }
 
+impl Terminal for OutputTextStream {
+    fn color_support(&self) -> TerminalColorSupport {
+        self.color_support
+    }
+}
+
 impl Drop for OutputTextStream {
     fn drop(&mut self) {
-        if let Some(mut stdout_helper_child) = self.stdout_helper_child.take() {
+        if let Some((mut stdout_helper_child, _raw_stdout)) = self.stdout_helper_child.take() {
             // Wait for the child. We can't return `Err` from a `drop` function,
             // so just print a message and return. Callers should use
             // `flush_with_status(Status::End)` to declare the end of the stream
             // if they wish to avoid these errors.
 
             // Close standard output, prompting the child process to exit.
-            close_stdout();
+            self.inner = OutputByteStream::from_writer(
+                "-".to_owned(),
+                Box::new(Vec::new()),
+                self.inner.type_().clone(),
+            );
 
             match stdout_helper_child.wait() {
                 Ok(status) => {
@@ -328,11 +366,4 @@ impl Debug for OutputTextStream {
         b.field("inner", &self.inner);
         b.finish()
     }
-}
-
-fn close_stdout() {
-    #[cfg(not(windows))]
-    let _ = unsafe { File::from_raw_fd(libc::STDOUT_FILENO) };
-    #[cfg(windows)]
-    let _ = unsafe { File::from_raw_handle(winapi::um::winbase::STD_OUTPUT_HANDLE) };
 }

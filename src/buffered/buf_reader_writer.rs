@@ -9,6 +9,7 @@ use std::{
     cmp, fmt,
     io::{self, BufRead, Error, ErrorKind, IoSlice, IoSliceMut, Write},
 };
+use terminal_support::{Terminal, TerminalColorSupport};
 
 /// Wraps a reader and writer and buffers their output.
 ///
@@ -630,12 +631,12 @@ impl<RW: ReadExt + WriteExt> ReadExt for BufReaderWriterBackend<RW> {
             self.discard_reader_buffer();
             return self.inner.as_mut().unwrap().read_with_status(buf);
         }
-        let size_and_status = {
+        let (size, status) = {
             let mut rem = SliceReader::new(self.fill_buf()?);
             rem.read_with_status(buf)?
         };
-        self.consume(size_and_status.0);
-        Ok(size_and_status)
+        self.consume(size);
+        Ok((size, status))
     }
 
     fn read_vectored_with_status(
@@ -647,12 +648,12 @@ impl<RW: ReadExt + WriteExt> ReadExt for BufReaderWriterBackend<RW> {
             self.discard_reader_buffer();
             return self.inner.as_mut().unwrap().read_vectored_with_status(bufs);
         }
-        let size_and_status = {
+        let (size, status) = {
             let mut rem = SliceReader::new(self.fill_buf()?);
             rem.read_vectored_with_status(bufs)?
         };
-        self.consume(size_and_status.0);
-        Ok(size_and_status)
+        self.consume(size);
+        Ok((size, status))
     }
 }
 
@@ -689,11 +690,30 @@ impl<RW: io::Read + io::Write> io::Read for BufReaderWriter<RW> {
 
 impl<RW: io::Read + io::Write> io::Read for BufReaderWriterBackend<RW> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.as_mut().unwrap().read(buf)
+        if self.pos == self.cap && buf.len() >= self.reader_buf.len() {
+            self.discard_reader_buffer();
+            return self.inner.as_mut().unwrap().read(buf);
+        }
+        let size = {
+            let mut rem = SliceReader::new(self.fill_buf()?);
+            rem.read(buf)?
+        };
+        self.consume(size);
+        Ok(size)
     }
 
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.inner.as_mut().unwrap().read_vectored(bufs)
+        let total_len = bufs.iter().map(|b| b.len()).sum::<usize>();
+        if self.pos == self.cap && total_len >= self.reader_buf.len() {
+            self.discard_reader_buffer();
+            return self.inner.as_mut().unwrap().read_vectored(bufs);
+        }
+        let size = {
+            let mut rem = SliceReader::new(self.fill_buf()?);
+            rem.read_vectored(bufs)?
+        };
+        self.consume(size);
+        Ok(size)
     }
 
     #[cfg(feature = "nightly")]
@@ -736,6 +756,7 @@ impl<RW: io::Read + io::Write> BufRead for BufReaderWriter<RW> {
     }
 }
 
+// FIXME: impl read_line for BufRead explicitly?
 impl<RW: io::Read + io::Write> BufRead for BufReaderWriterBackend<RW> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         // If we've reached the end of our internal buffer then we need to fetch
@@ -752,6 +773,23 @@ impl<RW: io::Read + io::Write> BufRead for BufReaderWriterBackend<RW> {
 
     fn consume(&mut self, amt: usize) {
         self.pos = cmp::min(self.pos + amt, self.cap);
+    }
+}
+
+impl<RW: io::Read + io::Write + Terminal> Terminal for BufReaderWriterBackend<RW> {
+    #[inline]
+    fn color_support(&self) -> TerminalColorSupport {
+        match &self.inner {
+            Some(inner) => inner.color_support(),
+            None => TerminalColorSupport::default(),
+        }
+    }
+}
+
+impl<RW: io::Read + io::Write + Terminal> Terminal for BufReaderWriter<RW> {
+    #[inline]
+    fn color_support(&self) -> TerminalColorSupport {
+        self.inner.color_support()
     }
 }
 

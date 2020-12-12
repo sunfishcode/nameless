@@ -10,8 +10,11 @@ categories = ["command-line-interface", "filesystem", "network-programming"]
 repository = "https://github.com/sunfishcode/nameless"
 readme = "README.md"
 
+[build-dependencies]
+rustc_version = "0.3.0"
+
 [dependencies]
-anyhow = "1.0.34"
+anyhow = "1.0.35"
 data-url = "0.1.0"
 flate2 = "1.0.19"
 io-ext = { path = "../io-ext" }
@@ -20,12 +23,12 @@ memchr = "2.3.4"
 mime = "0.3.16"
 mime_guess = "2.0.3"
 percent-encoding = "2.1.0"
-plain-text = { path = "../plain-text" }
+text-streams = { path = "../text-streams" }
 raw-stdio = { path = "../raw-stdio" }
 readwrite = { version = "0.1.2", optional = true }
-ureq = { version = "1.5.2", default-features = false, features = ["tls", "charset"] }
+ureq = { version = "1.5.4", default-features = false, features = ["tls", "charset"] }
 url = "2.2.0"
-terminal-color-support = { path = "../terminal-color-support" }
+terminal-support = { path = "../terminal-support" }
 
 [target.'cfg(not(windows))'.dependencies]
 libc = "0.2.80"

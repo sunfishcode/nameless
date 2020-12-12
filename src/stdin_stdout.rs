@@ -3,6 +3,10 @@
 
 use io_ext::{ReadExt, Status, WriteExt};
 use raw_stdio::{RawStdin, RawStdout};
+#[cfg(not(windows))]
+use std::os::unix::io::{AsRawFd, RawFd};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawHandle, RawHandle};
 use std::{
     fmt::Arguments,
     io::{self, IoSlice, IoSliceMut},
@@ -20,6 +24,26 @@ impl StdinStdout {
             stdin: RawStdin::new()?,
             stdout: RawStdout::new()?,
         })
+    }
+
+    // #[cfg(not(windows))]
+    // pub(crate) fn stdin_as_raw_fd(&self) -> RawFd {
+    // self.stdin.as_raw_fd()
+    // }
+
+    #[cfg(not(windows))]
+    pub(crate) fn stdout_as_raw_fd(&self) -> RawFd {
+        self.stdout.as_raw_fd()
+    }
+
+    // #[cfg(windows)]
+    // pub(crate) fn stdin_as_raw_handle(&self) -> RawHandle {
+    // self.stdin.as_raw_handle()
+    // }
+
+    #[cfg(windows)]
+    pub(crate) fn stdout_as_raw_handle(&self) -> RawHandle {
+        self.stdout.as_raw_handle()
     }
 }
 
