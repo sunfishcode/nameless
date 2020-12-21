@@ -32,7 +32,7 @@ This library provides:
    a step further and uses function argument syntax instead of having an
    options struct.
 
- - New buffered I/O helpers, [`BufReaderWriter`] and [`BufReaderLineWriter`],
+ - New buffered I/O helpers, [`BufInteractor`] and [`BufReaderLineWriter`],
    which work like [`BufReader`] combined with [`BufWriter`] and [`LineWriter`]
    respectively, and a [`ReadWrite`] trait which combines [`Read`] and [`Write`],
    for working with [`InteractiveByteStream`]s.
@@ -131,7 +131,7 @@ more examples.
 [`InputTextStream`]: https://docs.rs/nameless/latest/nameless/struct.InputTextStream.html
 [`OutputTextStream`]: https://docs.rs/nameless/latest/nameless/struct.OutputTextStream.html
 [`InteractiveByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InteractiveByteStream.html
-[`BufReaderWriter`]: https://docs.rs/nameless/latest/nameless/struct.BufReaderWriter.html
+[`BufInteractor`]: https://docs.rs/nameless/latest/nameless/struct.BufInteractor.html
 [`BufReaderLineWriter`]: https://docs.rs/nameless/latest/nameless/struct.BufReaderLineWriter.html
 [`ReadWrite`]: https://docs.rs/nameless/latest/nameless/trait.ReadWrite.html
 [`Regex`]: https://docs.rs/regex/latest/regex/struct.Regex.html

@@ -18,13 +18,14 @@ anyhow = "1.0.35"
 data-url = "0.1.0"
 flate2 = "1.0.19"
 io-ext = { path = "../io-ext" }
-io-ext-adapters = { path = "../io-ext-adapters" }
+io-ext-adapters = { path = "../io-ext-adapters", features = ["terminal-support"] }
+io-handles = { path = "../io-handles", features = ["io-ext", "terminal-support"] }
 memchr = "2.3.4"
 mime = "0.3.16"
 mime_guess = "2.0.3"
 percent-encoding = "2.1.0"
-text-streams = { path = "../text-streams" }
-raw-stdio = { path = "../raw-stdio" }
+text-streams = { path = "../text-streams", features = ["terminal-support"] }
+unsafe-io = { path = "../unsafe-io" }
 readwrite = { version = "0.1.2", optional = true }
 ureq = { version = "1.5.4", default-features = false, features = ["tls", "charset"] }
 url = "2.2.0"
@@ -46,10 +47,6 @@ regex = "1.4.2"
 clap = { path = "../clap" }
 clap_derive = { path = "../clap/clap_derive" }
 itertools = "0.9.0"
-
-[features]
-default = []
-nightly = []
 
 [badges]
 maintenance = { status = "actively-developed" }

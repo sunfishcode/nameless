@@ -19,11 +19,6 @@
 //!    a step further and uses function argument syntax instead of having an
 //!    options struct.
 //!
-//!  - New buffered I/O helpers, [`BufReaderWriter`] and [`BufReaderLineWriter`],
-//!    which work like [`BufReader`] combined with [`BufWriter`] and [`LineWriter`]
-//!    respectively, and a [`ReadWrite`] trait which combines [`Read`] and [`Write`],
-//!    for working with `InteractiveByteStream`s.
-//!
 //! When using these features, boilerplate for converting command-line argument
 //! strings into open files is abstracted away, allowing this library to
 //! transparently provide more features such as recognizing URLs and gzip'd files,
@@ -37,9 +32,6 @@
 //! [`clap-v3`]: https://crates.io/crates/clap-v3
 //! [`paw`]: https://crates.io/crates/paw
 //! [`kommand`]: https://crates.io/crates/kommand
-//! [`BufReader`]: https://doc.rust-lang.org/std/io/struct.BufReader.html
-//! [`BufWriter`]: https://doc.rust-lang.org/std/io/struct.BufWriter.html
-//! [`LineWriter`]: https://doc.rust-lang.org/std/io/struct.LineWriter.html
 //! [`Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
 //! [`Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
 //!
@@ -114,9 +106,11 @@
 //! [`InputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html
 //! [`OutputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.OutputByteStream.html
 //! [`InteractiveByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InteractiveByteStream.html
-//! [`BufReaderWriter`]: https://docs.rs/nameless/latest/nameless/struct.BufReaderWriter.html
-//! [`BufReaderLineWriter`]: https://docs.rs/nameless/latest/nameless/struct.BufReaderLineWriter.html
-//! [`ReadWrite`]: https://docs.rs/nameless/latest/nameless/trait.ReadWrite.html
+//! [`BufReader`]: https://doc.rust-lang.org/std/io/struct.BufReader.html
+//! [`BufWriter`]: https://doc.rust-lang.org/std/io/struct.BufWriter.html
+//! [`LineWriter`]: https://doc.rust-lang.org/std/io/struct.LineWriter.html
+//! [`BufInteractor`]: https://docs.rs/io-handles/latest/io_handles/struct.BufInteractor.html
+//! [`BufReaderLineWriter`]: https://docs.rs/io-handles/latest/io_handles/struct.BufReaderLineWriter.html
 //! [`Regex`]: https://docs.rs/regex/latest/regex/struct.Regex.html
 //! [`Duration`]: https://docs.rs/humantime/latest/humantime/struct.Duration.html
 //! [the examples directory]: examples
@@ -141,17 +135,12 @@
 //! — <cite>"Through the Looking Glass", by Lewis Carroll</cite>
 
 #![deny(missing_docs)]
-#![cfg_attr(feature = "nightly", feature(read_initializer))]
-#![cfg_attr(feature = "nightly", feature(can_vector))]
-#![cfg_attr(feature = "nightly", feature(write_all_vectored))]
+#![cfg_attr(read_initializer, feature(read_initializer))]
+#![cfg_attr(can_vector, feature(can_vector))]
+#![cfg_attr(write_all_vectored, feature(write_all_vectored))]
 
 pub use mime::Mime;
 
-mod buffered;
-#[cfg(not(windows))]
-mod child_stdin_stdout;
-#[cfg(not(windows))]
-mod command_stdin_stdout;
 mod input_byte_stream;
 mod input_text_stream;
 mod interactive_byte_stream;
@@ -160,13 +149,11 @@ mod output_byte_stream;
 mod output_text_stream;
 mod path_to_name;
 mod pseudonym;
-mod read_write;
-mod stdin_stdout;
+mod interact_terminal_ext;
 #[cfg(unix)]
 mod summon_bat;
 mod r#type;
 
-pub use buffered::{BufReaderLineWriter, BufReaderWriter, IntoInnerError};
 pub use input_byte_stream::InputByteStream;
 pub use input_text_stream::InputTextStream;
 pub use interactive_byte_stream::InteractiveByteStream;

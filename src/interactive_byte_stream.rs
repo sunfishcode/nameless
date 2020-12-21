@@ -1,18 +1,23 @@
-use crate::{stdin_stdout::StdinStdout, Pseudonym};
+use crate::Pseudonym;
 use anyhow::anyhow;
 use io_ext::{
     default_read, default_read_exact, default_read_to_end, default_read_to_string,
-    default_read_vectored, ReadExt, ReadWriteExt, Status, WriteExt,
+    default_read_vectored, Bufferable, ReadExt, InteractExt, Status, WriteExt,
 };
-use io_ext_adapters::StdReaderWriter;
+use io_ext_adapters::ExtInteractor;
+use io_handles::InteractHandle;
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::{
     fmt::{self, Arguments, Debug, Formatter},
-    io::{self, IoSlice, IoSliceMut},
+    io::{self, IoSlice, IoSliceMut, Read, Write},
     net::{TcpListener, TcpStream},
     path::Path,
     str::FromStr,
+};
+use terminal_support::{
+    NeverTerminalInteractor, ReadTerminal, InteractTerminal, Terminal, TerminalColorSupport,
+    WriteTerminal,
 };
 use url::Url;
 #[cfg(not(windows))]
@@ -34,15 +39,26 @@ use {crate::path_to_name::path_to_name, std::fs::OpenOptions};
 ///    (stdin, stdout), on platforms whch support it.
 pub struct InteractiveByteStream {
     name: String,
-    reader_writer: Box<dyn ReadWriteExt>,
+    interactor: ExtInteractor<NeverTerminalInteractor<InteractHandle>>,
 }
 
 impl InteractiveByteStream {
     /// Return a `Pseudonym` which encapsulates this stream's name (typically
     /// its filesystem path or its URL). This allows it to be written to an
-    /// `OutputByteStream` while otherwise remaining entirely opaque.
+    /// `InteractiveByteStream` while otherwise remaining entirely opaque.
     pub fn pseudonym(&self) -> Pseudonym {
         Pseudonym::new(self.name.clone())
+    }
+
+    /// Used by `InteractiveTextStream` to convert from `InteractiveByteStream`.
+    #[inline]
+    pub(crate) fn into_parts(
+        self,
+    ) -> (
+        String,
+        ExtInteractor<NeverTerminalInteractor<InteractHandle>>,
+    ) {
+        (self.name, self.interactor)
     }
 
     fn from_str(s: &str) -> Result<Self, anyhow::Error> {
@@ -66,21 +82,14 @@ impl InteractiveByteStream {
         Self::from_path(Path::new(s))
     }
 
-    pub(crate) fn from_reader_writer(name: String, reader_writer: Box<dyn ReadWriteExt>) -> Self {
-        Self {
-            name,
-            reader_writer,
-        }
-    }
-
     /// Return an interactive byte stream representing standard input and standard output.
     pub fn stdin_stdout() -> anyhow::Result<Self> {
+        let interactor = InteractHandle::stdin_stdout()?;
+        let interactor = NeverTerminalInteractor::new(interactor);
+        let interactor = ExtInteractor::new(interactor);
         Ok(Self {
             name: "-".to_owned(),
-            reader_writer: Box::new(
-                StdinStdout::new()
-                    .ok_or_else(|| anyhow!("attempted to open stdin or stdout multiple times"))?,
-            ),
+            interactor,
         })
     }
 
@@ -115,16 +124,18 @@ impl InteractiveByteStream {
                 None => return Err(anyhow!("TCP connect URL should have a host")),
             };
 
-            let stream = TcpStream::connect(format!("{}:{}", host_str, port))?;
-            let stream = StdReaderWriter::new(stream);
+            let interactor = TcpStream::connect(format!("{}:{}", host_str, port))?;
+            let interactor = InteractHandle::tcp_stream(interactor);
+            let interactor = NeverTerminalInteractor::new(interactor);
+            let interactor = ExtInteractor::new(interactor);
 
             return Ok(Self {
                 name: url.to_string(),
-                reader_writer: Box::new(stream),
+                interactor,
             });
         }
 
-        #[cfg(not(windows))]
+        #[cfg(unix)]
         {
             if url.port().is_some() || url.host_str().is_some() {
                 return Err(anyhow!(
@@ -132,12 +143,14 @@ impl InteractiveByteStream {
                 ));
             }
 
-            let stream = UnixStream::connect(url.path())?;
-            let stream = StdReaderWriter::new(stream);
+            let interactor = UnixStream::connect(url.path())?;
+            let interactor = InteractHandle::unix_stream(interactor);
+            let interactor = NeverTerminalInteractor::new(interactor);
+            let interactor = ExtInteractor::new(interactor);
 
             return Ok(Self {
                 name: url.to_string(),
-                reader_writer: Box::new(stream),
+                interactor,
             });
         }
 
@@ -166,16 +179,18 @@ impl InteractiveByteStream {
 
             let listener = TcpListener::bind(format!("{}:{}", host_str, port))?;
 
-            let (stream, addr) = listener.accept()?;
-            let stream = StdReaderWriter::new(stream);
+            let (interactor, addr) = listener.accept()?;
+            let interactor = InteractHandle::tcp_stream(interactor);
+            let interactor = NeverTerminalInteractor::new(interactor);
+            let interactor = ExtInteractor::new(interactor);
 
             return Ok(Self {
                 name: format!("accept://{}", addr),
-                reader_writer: Box::new(stream),
+                interactor,
             });
         }
 
-        #[cfg(not(windows))]
+        #[cfg(unix)]
         {
             if url.port().is_some() || url.host_str().is_some() {
                 return Err(anyhow!(
@@ -185,14 +200,16 @@ impl InteractiveByteStream {
 
             let listener = UnixListener::bind(url.path())?;
 
-            let (stream, addr) = listener.accept()?;
-            let stream = StdReaderWriter::new(stream);
+            let (interactor, addr) = listener.accept()?;
+            let interactor = InteractHandle::unix_stream(interactor);
+            let interactor = NeverTerminalInteractor::new(interactor);
+            let interactor = ExtInteractor::new(interactor);
 
             let name = path_to_name("accept", addr.as_pathname().unwrap())?;
 
             return Ok(Self {
                 name,
-                reader_writer: Box::new(stream),
+                interactor,
             });
         }
 
@@ -208,20 +225,23 @@ impl InteractiveByteStream {
         let name = path_to_name("file", path)?;
         // TODO: Should we have our own error type?
         let mut options = OpenOptions::new();
-        let file = options
+        let interactor = options
             .read(true)
             .write(true)
             .open(path)
             .map_err(|err| anyhow!("{}: {}", path.display(), err))?;
-        let metadata = file.metadata()?;
+        let metadata = interactor.metadata()?;
         if !metadata.file_type().is_char_device() {
             return Err(anyhow!(
                 "path to interactive channel must be a character device"
             ));
         }
+        let interactor = InteractHandle::char_device(interactor);
+        let interactor = NeverTerminalInteractor::new(interactor);
+        let interactor = ExtInteractor::new(interactor);
         Ok(Self {
             name,
-            reader_writer: Box::new(StdReaderWriter::new(file)),
+            interactor,
         })
     }
 
@@ -245,11 +265,12 @@ impl InteractiveByteStream {
             .ok_or_else(|| anyhow!("child stream specified with '(...)' must contain a command"))?;
         let mut command = std::process::Command::new(first);
         command.args(rest);
+        let interactor = InteractHandle::interact_with_command(command)?;
+        let interactor = NeverTerminalInteractor::new(interactor);
+        let interactor = ExtInteractor::new(interactor);
         Ok(Self {
             name: s.to_owned(),
-            reader_writer: Box::new(crate::command_stdin_stdout::CommandStdinStdout::new(
-                command,
-            )),
+            interactor,
         })
     }
 }
@@ -271,7 +292,7 @@ impl FromStr for InteractiveByteStream {
 impl ReadExt for InteractiveByteStream {
     #[inline]
     fn read_with_status(&mut self, buf: &mut [u8]) -> io::Result<(usize, Status)> {
-        self.reader_writer.read_with_status(buf)
+        self.interactor.read_with_status(buf)
     }
 
     #[inline]
@@ -279,11 +300,11 @@ impl ReadExt for InteractiveByteStream {
         &mut self,
         bufs: &mut [IoSliceMut<'_>],
     ) -> io::Result<(usize, Status)> {
-        self.reader_writer.read_vectored_with_status(bufs)
+        self.interactor.read_vectored_with_status(bufs)
     }
 }
 
-impl io::Read for InteractiveByteStream {
+impl Read for InteractiveByteStream {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         default_read(self, buf)
@@ -294,10 +315,10 @@ impl io::Read for InteractiveByteStream {
         default_read_vectored(self, bufs)
     }
 
-    #[cfg(feature = "nightly")]
+    #[cfg(can_vector)]
     #[inline]
     fn is_read_vectored(&self) -> bool {
-        self.reader_writer.is_read_vectored()
+        self.interactor.is_read_vectored()
     }
 
     #[inline]
@@ -318,59 +339,96 @@ impl io::Read for InteractiveByteStream {
 
 impl WriteExt for InteractiveByteStream {
     #[inline]
-    fn flush_with_status(&mut self, status: Status) -> io::Result<()> {
-        self.reader_writer.flush_with_status(status)
-    }
-
-    #[inline]
-    fn abandon(&mut self) {
-        self.reader_writer.abandon()
+    fn end(&mut self) -> io::Result<()> {
+        self.interactor.end()
     }
 
     #[inline]
     fn write_str(&mut self, buf: &str) -> io::Result<()> {
-        self.reader_writer.write_str(buf)
+        self.interactor.write_str(buf)
     }
 }
 
-impl io::Write for InteractiveByteStream {
+impl Write for InteractiveByteStream {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.reader_writer.write(buf)
+        self.interactor.write(buf)
     }
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        self.reader_writer.flush()
+        self.interactor.flush()
     }
 
     #[inline]
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.reader_writer.write_vectored(bufs)
+        self.interactor.write_vectored(bufs)
     }
 
-    #[cfg(feature = "nightly")]
+    #[cfg(can_vector)]
     #[inline]
     fn is_write_vectored(&self) -> bool {
-        self.reader_writer.is_write_vectored()
+        self.interactor.is_write_vectored()
     }
 
     #[inline]
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        self.reader_writer.write_all(buf)
+        self.interactor.write_all(buf)
     }
 
-    #[cfg(feature = "nightly")]
+    #[cfg(write_all_vectored)]
     #[inline]
     fn write_all_vectored(&mut self, bufs: &mut [IoSlice<'_>]) -> io::Result<()> {
-        self.reader_writer.write_all_vectored(bufs)
+        self.interactor.write_all_vectored(bufs)
     }
 
     #[inline]
     fn write_fmt(&mut self, fmt: Arguments<'_>) -> io::Result<()> {
-        self.reader_writer.write_fmt(fmt)
+        self.interactor.write_fmt(fmt)
     }
 }
+
+impl Bufferable for InteractiveByteStream {
+    #[inline]
+    fn abandon(&mut self) {
+        self.interactor.abandon()
+    }
+}
+
+impl Terminal for InteractiveByteStream {}
+
+impl ReadTerminal for InteractiveByteStream {
+    #[inline]
+    fn is_line_by_line(&self) -> bool {
+        self.interactor.is_line_by_line()
+    }
+
+    #[inline]
+    fn is_input_terminal(&self) -> bool {
+        self.interactor.is_input_terminal()
+    }
+}
+
+impl WriteTerminal for InteractiveByteStream {
+    #[inline]
+    fn color_support(&self) -> TerminalColorSupport {
+        self.interactor.color_support()
+    }
+
+    #[inline]
+    fn color_preference(&self) -> bool {
+        self.interactor.color_preference()
+    }
+
+    #[inline]
+    fn is_output_terminal(&self) -> bool {
+        self.interactor.is_output_terminal()
+    }
+}
+
+impl InteractTerminal for InteractiveByteStream {}
+
+impl InteractExt for InteractiveByteStream {}
 
 impl Debug for InteractiveByteStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

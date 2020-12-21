@@ -1,7 +1,8 @@
 //! An example client program for the `repl` example. See the `repl` example
 //! for details.
 
-use nameless::{BufReaderLineWriter, InteractiveTextStream};
+use io_handles::BufReaderLineWriter;
+use nameless::InteractiveTextStream;
 use std::{
     io::{BufRead, Read, Write},
     str,
@@ -32,10 +33,7 @@ fn main(io: InteractiveTextStream) -> anyhow::Result<()> {
     // Read another "prompt> ".
     io.read_exact(&mut v)?;
     if str::from_utf8(&v).unwrap() != PROMPT {
-        panic!(
-            "missed second prompt: {:?}",
-            String::from_utf8_lossy(&v)
-        );
+        panic!("missed second prompt: {:?}", String::from_utf8_lossy(&v));
     }
 
     // Write "world".

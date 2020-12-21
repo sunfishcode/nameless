@@ -1,38 +1,24 @@
 use crate::Type;
-use raw_stdio::RawStdout;
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd};
-#[cfg(windows)]
-use std::os::windows::io::{AsRawHandle, FromRawHandle};
+use std::os::unix::io::AsRawFd;
 use std::{
-    fs::File,
     io,
-    mem::ManuallyDrop,
     process::{Child, Command, Stdio},
 };
-use terminal_support::{detect_terminal_color_support, TerminalColorSupport};
+use terminal_support::WriteTerminal;
+use unsafe_io::AsUnsafeHandle;
 
 /// Arrange for stdout to be connected to a pipe to a process which runs
 /// bat to do syntax highlighting and paging.
-///
-/// TODO: Differentiate between classic ANSI 8 colors, 16 colors, the
-/// 256-color cube, and possibly the 24-bit "true color".
 pub(crate) fn summon_bat(
-    stdout: &RawStdout,
+    stdout: &(impl WriteTerminal + AsUnsafeHandle),
     type_: &Type,
-) -> io::Result<(bool, TerminalColorSupport, Option<Child>)> {
-    let (isatty, color_support) = detect_terminal_color_support(&ManuallyDrop::new(unsafe {
-        #[cfg(not(windows))]
-        {
-            File::from_raw_fd(stdout.as_raw_fd())
-        }
-        #[cfg(windows)]
-        {
-            File::from_raw_handle(stdout.as_raw_handle())
-        }
-    }));
-    if !isatty {
-        return Ok((isatty, color_support, None));
+) -> io::Result<Option<Child>> {
+    #[cfg(not(windows))]
+    assert_eq!(stdout.as_unsafe_handle().as_raw_fd(), libc::STDOUT_FILENO);
+
+    if !stdout.is_output_terminal() {
+        return Ok(None);
     }
 
     // If the "bat" command is available, use it.
@@ -45,8 +31,8 @@ pub(crate) fn summon_bat(
         .spawn()
     {
         Ok(child) => child,
-        Err(_) => return Ok((isatty, color_support, None)),
+        Err(_) => return Ok(None),
     };
 
-    Ok((isatty, color_support, Some(child)))
+    Ok(Some(child))
 }

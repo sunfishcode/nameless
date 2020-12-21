@@ -2,16 +2,17 @@ use crate::{path_to_name::path_to_name, Mime, Pseudonym, Type};
 use anyhow::anyhow;
 use data_url::DataUrl;
 use flate2::read::GzDecoder;
-use io_ext::{ReadExt, Status};
-use io_ext_adapters::StdReader;
-use raw_stdio::RawStdin;
+use io_ext::{Bufferable, ReadExt, Status};
+use io_ext_adapters::ExtReader;
+use io_handles::ReadHandle;
 use std::{
     fmt::{self, Debug, Formatter},
     fs::File,
-    io::{self, Cursor, IoSliceMut},
+    io::{self, IoSliceMut, Read},
     path::Path,
     str::FromStr,
 };
+use terminal_support::NeverTerminalReader;
 use url::Url;
 
 /// An input stream for binary input.
@@ -42,7 +43,7 @@ use url::Url;
 ///    local path, arrange for it to begin with `./` or `/`.
 pub struct InputByteStream {
     name: String,
-    reader: Box<dyn ReadExt>,
+    reader: ExtReader<NeverTerminalReader<ReadHandle>>,
     type_: Type,
     initial_size: Option<u64>,
 }
@@ -53,6 +54,7 @@ impl InputByteStream {
     /// though some do not. This is strictly based on available metadata, and
     /// not on examining any of the contents of the stream, and there's no
     /// guarantee the contents are valid.
+    #[inline]
     pub fn type_(&self) -> &Type {
         &self.type_
     }
@@ -61,6 +63,7 @@ impl InputByteStream {
     /// on available metadata, and not on examining any of the contents of the
     /// stream, and the stream could end up being shorter or longer if the
     /// source is concurrently modified.
+    #[inline]
     pub fn initial_size(&self) -> Option<u64> {
         self.initial_size
     }
@@ -68,8 +71,22 @@ impl InputByteStream {
     /// Return a `Pseudonym` which encapsulates this stream's name (typically
     /// its filesystem path or its URL). This allows it to be written to an
     /// `OutputByteStream` while otherwise remaining entirely opaque.
+    #[inline]
     pub fn pseudonym(&self) -> Pseudonym {
         Pseudonym::new(self.name.clone())
+    }
+
+    /// Used by `InputTextStream` to convert from `InputByteStream`.
+    #[inline]
+    pub(crate) fn into_parts(
+        self,
+    ) -> (
+        String,
+        ExtReader<NeverTerminalReader<ReadHandle>>,
+        Type,
+        Option<u64>,
+    ) {
+        (self.name, self.reader, self.type_, self.initial_size)
     }
 
     fn from_str(s: &str) -> Result<Self, anyhow::Error> {
@@ -93,27 +110,14 @@ impl InputByteStream {
         Self::from_path(Path::new(s))
     }
 
-    pub(crate) fn from_reader(
-        name: String,
-        reader: Box<dyn ReadExt>,
-        type_: Type,
-        initial_size: Option<u64>,
-    ) -> Self {
-        Self {
-            name,
-            reader,
-            type_,
-            initial_size,
-        }
-    }
-
     /// Return an input byte stream representing standard input.
     pub fn stdin() -> anyhow::Result<Self> {
+        let reader = ReadHandle::stdin()?;
+        let reader = NeverTerminalReader::new(reader);
+        let reader = ExtReader::new(reader);
         Ok(Self {
             name: "-".to_owned(),
-            reader: Box::new(
-                RawStdin::new().ok_or_else(|| anyhow!("attempted to open stdin multiple times"))?,
-            ),
+            reader,
             type_: Type::unknown(),
             initial_size: None,
         })
@@ -167,10 +171,14 @@ impl InputByteStream {
         let content_type = response.content_type();
         let type_ = Type::from_mime(Mime::from_str(content_type)?);
 
+        let reader = response.into_reader();
+        let reader = ReadHandle::piped_thread(Box::new(reader))?;
+        let reader = NeverTerminalReader::new(reader);
+        let reader = ExtReader::new(reader);
         Ok(Self {
             name: http_url_str.to_owned(),
             type_,
-            reader: Box::new(StdReader::generic(response.into_reader())),
+            reader,
             initial_size,
         })
     }
@@ -193,9 +201,12 @@ impl InputByteStream {
         // TODO: Consider submitting patches to `data_url` to streamline this.
         let type_ = Type::from_mime(Mime::from_str(&data_url.mime_type().to_string()).unwrap());
 
+        let reader = ReadHandle::bytes(&body)?;
+        let reader = NeverTerminalReader::new(reader);
+        let reader = ExtReader::new(reader);
         Ok(Self {
             name: data_url_str.to_owned(),
-            reader: Box::new(StdReader::generic(Cursor::new(body))),
+            reader,
             type_,
             initial_size: Some(data_url_str.len() as u64),
         })
@@ -211,18 +222,25 @@ impl InputByteStream {
             let path = path.with_extension("");
             let type_ = Type::from_extension(path.extension());
             let initial_size = None;
+            let reader = GzDecoder::new(file);
+            let reader = ReadHandle::piped_thread(Box::new(reader))?;
+            let reader = NeverTerminalReader::new(reader);
+            let reader = ExtReader::new(reader);
             Ok(Self {
                 name,
-                reader: Box::new(StdReader::generic(GzDecoder::new(file))),
+                reader,
                 type_,
                 initial_size,
             })
         } else {
             let type_ = Type::from_extension(path.extension());
             let initial_size = Some(file.metadata()?.len());
+            let reader = ReadHandle::file(file);
+            let reader = NeverTerminalReader::new(reader);
+            let reader = ExtReader::new(reader);
             Ok(Self {
                 name,
-                reader: Box::new(StdReader::new(file)),
+                reader,
                 type_,
                 initial_size,
             })
@@ -245,9 +263,12 @@ impl InputByteStream {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .spawn()?;
+        let reader = ReadHandle::child_stdout(child.stdout.unwrap());
+        let reader = NeverTerminalReader::new(reader);
+        let reader = ExtReader::new(reader);
         Ok(Self {
             name: s.to_owned(),
-            reader: Box::new(StdReader::new(child.stdout.unwrap())),
+            reader,
             type_: Type::unknown(),
             initial_size: None,
         })
@@ -283,7 +304,7 @@ impl ReadExt for InputByteStream {
     }
 }
 
-impl io::Read for InputByteStream {
+impl Read for InputByteStream {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.reader.read(buf)
@@ -294,7 +315,7 @@ impl io::Read for InputByteStream {
         self.reader.read_vectored(bufs)
     }
 
-    #[cfg(feature = "nightly")]
+    #[cfg(can_vector)]
     #[inline]
     fn is_read_vectored(&self) -> bool {
         self.reader.is_read_vectored()
@@ -316,6 +337,13 @@ impl io::Read for InputByteStream {
     }
 }
 
+impl Bufferable for InputByteStream {
+    #[inline]
+    fn abandon(&mut self) {
+        self.reader.abandon()
+    }
+}
+
 impl Debug for InputByteStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // Don't print the name here, as that's an implementation detail.
@@ -328,7 +356,6 @@ impl Debug for InputByteStream {
 
 #[test]
 fn data_url_plain() {
-    use std::io::Read;
     let mut s = String::new();
     InputByteStream::from_str("data:,Hello%2C%20World!")
         .unwrap()
@@ -339,7 +366,6 @@ fn data_url_plain() {
 
 #[test]
 fn data_url_base64() {
-    use std::io::Read;
     let mut s = String::new();
     InputByteStream::from_str("data:text/plain;base64,SGVsbG8sIFdvcmxkIQ==")
         .unwrap()

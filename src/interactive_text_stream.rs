@@ -1,26 +1,24 @@
-use crate::{stdin_stdout::StdinStdout, InteractiveByteStream, Pseudonym};
+use crate::{InteractiveByteStream, Pseudonym};
 use anyhow::anyhow;
-use io_ext::{ReadExt, ReadWriteExt, Status, WriteExt};
-use io_ext_adapters::StdReaderWriter;
+use io_ext::{Bufferable, ReadExt, InteractExt, Status, WriteExt};
+use io_ext_adapters::ExtInteractor;
+use io_handles::InteractHandle;
 #[cfg(unix)]
-use std::os::unix::{
-    io::FromRawFd,
-    net::{UnixListener, UnixStream},
-};
+use std::os::unix::net::{UnixListener, UnixStream};
 #[cfg(windows)]
 use std::os::windows::io::FromRawHandle;
 use std::{
     fmt::{self, Arguments, Debug, Formatter},
-    fs::File,
-    io::{self, IoSlice, IoSliceMut},
+    io::{self, IoSlice, IoSliceMut, Read, Write},
     net::{TcpListener, TcpStream},
     path::Path,
     str::FromStr,
 };
 use terminal_support::{
-    detect_terminal_color_support, ReadWriteTerminal, Terminal, TerminalColorSupport,
+    ReadTerminal, InteractTerminal, Terminal, TerminalColorSupport, TerminalInteractor,
+    WriteTerminal,
 };
-use text_streams::TextReaderWriter;
+use text_streams::{TextInteractor, ReadStr};
 use url::Url;
 #[cfg(not(windows))]
 use {crate::path_to_name::path_to_name, std::fs::OpenOptions};
@@ -40,19 +38,26 @@ use {crate::path_to_name::path_to_name, std::fs::OpenOptions};
 ///  - "(...)" runs a command with pipes to and from the child process'
 ///    (stdin, stdout), on platforms whch support it.
 pub struct InteractiveTextStream {
-    inner: InteractiveByteStream,
-    color_support: TerminalColorSupport,
+    name: String,
+    inner: TextInteractor<ExtInteractor<TerminalInteractor<InteractHandle>>>,
 }
 
 impl InteractiveTextStream {
-    /// Return a `Pseudonym` which encapsulates this stream's name (typically
-    /// its filesystem path or its URL). This allows it to be written to an
-    /// `OutputTextStream` while otherwise remaining entirely opaque.
-    pub fn pseudonym(&self) -> Pseudonym {
-        self.inner.pseudonym()
+    /// Write the given `Pseudonym` to the output stream.
+    #[inline]
+    pub fn write_pseudonym(&mut self, pseudonym: &Pseudonym) -> io::Result<()> {
+        Write::write_all(self, pseudonym.name.as_bytes())
     }
 
-    /// FIXME: dedup some of this with bytestream?
+    /// Write the name of the given output stream to the output stream. This is
+    /// needed because the name of an `InteractiveTextStream` is not available in
+    /// the public API.
+    #[inline]
+    pub fn pseudonym(&self) -> Pseudonym {
+        Pseudonym::new(self.name.clone())
+    }
+
+    /// fixme: dedup some of this with bytestream?
     fn from_str(s: &str) -> Result<Self, anyhow::Error> {
         // If we can parse it as a URL, treat it as such.
         if let Ok(url) = Url::parse(s) {
@@ -76,31 +81,15 @@ impl InteractiveTextStream {
 
     /// Return an interactive byte stream representing standard input and standard output.
     pub fn stdin_stdout() -> anyhow::Result<Self> {
-        let reader_writer = StdinStdout::new()
-            .ok_or_else(|| anyhow!("attempted to open stdin or stdout multiple times"))?;
-
-        #[cfg(not(windows))]
-        let (_isatty, color_support) =
-            detect_terminal_color_support(&std::mem::ManuallyDrop::new(unsafe {
-                File::from_raw_fd(reader_writer.stdout_as_raw_fd())
-            }));
-
-        #[cfg(windows)]
-        let (_isatty, color_support) =
-            detect_terminal_color_support(&std::mem::ManuallyDrop::new(unsafe {
-                File::from_raw_handle(reader_writer.stdout_as_raw_handle())
-            }));
-
-        let reader_writer = TextReaderWriter::with_ansi_color_output(
-            reader_writer,
-            color_support != TerminalColorSupport::Monochrome,
-        );
+        let stdin_stdout = InteractiveByteStream::stdin_stdout()?;
+        let (name, interactor) = stdin_stdout.into_parts();
+        let interactor = interactor.abandon_into_inner().unwrap().into_inner();
+        let interactor = TerminalInteractor::with_handle(interactor);
+        let interactor = ExtInteractor::new(interactor);
+        let interactor = TextInteractor::with_ansi_color_output(interactor);
         Ok(Self {
-            inner: InteractiveByteStream::from_reader_writer(
-                "-".to_owned(),
-                Box::new(reader_writer),
-            ),
-            color_support,
+            name,
+            inner: interactor,
         })
     }
 
@@ -135,17 +124,19 @@ impl InteractiveTextStream {
                 None => return Err(anyhow!("TCP connect URL should have a host")),
             };
 
-            let stream = TcpStream::connect(format!("{}:{}", host_str, port))?;
-            let stream = StdReaderWriter::new(stream);
-            let stream = TextReaderWriter::new(stream);
+            let interactor = TcpStream::connect(format!("{}:{}", host_str, port))?;
+            let interactor = InteractHandle::tcp_stream(interactor);
+            let interactor = TerminalInteractor::generic(interactor);
+            let interactor = ExtInteractor::new(interactor);
+            let interactor = TextInteractor::new(interactor);
 
             return Ok(Self {
-                inner: InteractiveByteStream::from_reader_writer(url.to_string(), Box::new(stream)),
-                color_support: TerminalColorSupport::default(),
+                name: url.to_string(),
+                inner: interactor,
             });
         }
 
-        #[cfg(not(windows))]
+        #[cfg(unix)]
         {
             if url.port().is_some() || url.host_str().is_some() {
                 return Err(anyhow!(
@@ -153,13 +144,15 @@ impl InteractiveTextStream {
                 ));
             }
 
-            let stream = UnixStream::connect(url.path())?;
-            let stream = StdReaderWriter::new(stream);
-            let stream = TextReaderWriter::new(stream);
+            let interactor = UnixStream::connect(url.path())?;
+            let interactor = InteractHandle::unix_stream(interactor);
+            let interactor = TerminalInteractor::generic(interactor);
+            let interactor = ExtInteractor::new(interactor);
+            let interactor = TextInteractor::new(interactor);
 
             return Ok(Self {
-                inner: InteractiveByteStream::from_reader_writer(url.to_string(), Box::new(stream)),
-                color_support: TerminalColorSupport::default(),
+                name: url.to_string(),
+                inner: interactor,
             });
         }
 
@@ -188,20 +181,19 @@ impl InteractiveTextStream {
 
             let listener = TcpListener::bind(format!("{}:{}", host_str, port))?;
 
-            let (stream, addr) = listener.accept()?;
-            let stream = StdReaderWriter::new(stream);
-            let stream = TextReaderWriter::new(stream);
+            let (interactor, addr) = listener.accept()?;
+            let interactor = InteractHandle::tcp_stream(interactor);
+            let interactor = TerminalInteractor::generic(interactor);
+            let interactor = ExtInteractor::new(interactor);
+            let interactor = TextInteractor::new(interactor);
 
             return Ok(Self {
-                inner: InteractiveByteStream::from_reader_writer(
-                    format!("accept://{}", addr),
-                    Box::new(stream),
-                ),
-                color_support: TerminalColorSupport::default(),
+                name: format!("accept://{}", addr),
+                inner: interactor,
             });
         }
 
-        #[cfg(not(windows))]
+        #[cfg(unix)]
         {
             if url.port().is_some() || url.host_str().is_some() {
                 return Err(anyhow!(
@@ -211,15 +203,17 @@ impl InteractiveTextStream {
 
             let listener = UnixListener::bind(url.path())?;
 
-            let (stream, addr) = listener.accept()?;
-            let stream = StdReaderWriter::new(stream);
-            let stream = TextReaderWriter::new(stream);
+            let (interactor, addr) = listener.accept()?;
+            let interactor = InteractHandle::unix_stream(interactor);
+            let interactor = TerminalInteractor::generic(interactor);
+            let interactor = ExtInteractor::new(interactor);
+            let interactor = TextInteractor::new(interactor);
 
             let name = path_to_name("accept", addr.as_pathname().unwrap())?;
 
             return Ok(Self {
-                inner: InteractiveByteStream::from_reader_writer(name, Box::new(stream)),
-                color_support: TerminalColorSupport::default(),
+                name,
+                inner: interactor,
             });
         }
 
@@ -246,12 +240,13 @@ impl InteractiveTextStream {
                 "path to interactive channel must be a character device"
             ));
         }
-        let (_isatty, color_support) = detect_terminal_color_support(&file);
-        let reader_writer = StdReaderWriter::new(file);
-        let reader_writer = TextReaderWriter::new(reader_writer);
+        let interactor = InteractHandle::char_device(file);
+        let interactor = TerminalInteractor::with_handle(interactor);
+        let interactor = ExtInteractor::new(interactor);
+        let interactor = TextInteractor::new(interactor);
         Ok(Self {
-            inner: InteractiveByteStream::from_reader_writer(name, Box::new(reader_writer)),
-            color_support,
+            name,
+            inner: interactor,
         })
     }
 
@@ -275,11 +270,13 @@ impl InteractiveTextStream {
             .ok_or_else(|| anyhow!("child stream specified with '(...)' must contain a command"))?;
         let mut command = std::process::Command::new(first);
         command.args(rest);
-        let reader_writer = crate::command_stdin_stdout::CommandStdinStdout::new(command);
-        let reader_writer = TextReaderWriter::new(reader_writer);
+        let interactor = InteractHandle::interact_with_command(command)?;
+        let interactor = TerminalInteractor::generic(interactor);
+        let interactor = ExtInteractor::new(interactor);
+        let interactor = TextInteractor::new(interactor);
         Ok(Self {
-            inner: InteractiveByteStream::from_reader_writer(s.to_owned(), Box::new(reader_writer)),
-            color_support: TerminalColorSupport::default(),
+            name: s.to_owned(),
+            inner: interactor,
         })
     }
 }
@@ -313,7 +310,7 @@ impl ReadExt for InteractiveTextStream {
     }
 }
 
-impl io::Read for InteractiveTextStream {
+impl Read for InteractiveTextStream {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf)
@@ -324,7 +321,7 @@ impl io::Read for InteractiveTextStream {
         self.inner.read_vectored(bufs)
     }
 
-    #[cfg(feature = "nightly")]
+    #[cfg(can_vector)]
     #[inline]
     fn is_read_vectored(&self) -> bool {
         self.inner.is_read_vectored()
@@ -348,13 +345,8 @@ impl io::Read for InteractiveTextStream {
 
 impl WriteExt for InteractiveTextStream {
     #[inline]
-    fn flush_with_status(&mut self, status: Status) -> io::Result<()> {
-        self.inner.flush_with_status(status)
-    }
-
-    #[inline]
-    fn abandon(&mut self) {
-        self.inner.abandon()
+    fn end(&mut self) -> io::Result<()> {
+        self.inner.end()
     }
 
     #[inline]
@@ -363,7 +355,7 @@ impl WriteExt for InteractiveTextStream {
     }
 }
 
-impl io::Write for InteractiveTextStream {
+impl Write for InteractiveTextStream {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.write(buf)
@@ -379,7 +371,7 @@ impl io::Write for InteractiveTextStream {
         self.inner.write_vectored(bufs)
     }
 
-    #[cfg(feature = "nightly")]
+    #[cfg(can_vector)]
     #[inline]
     fn is_write_vectored(&self) -> bool {
         self.inner.is_write_vectored()
@@ -390,7 +382,7 @@ impl io::Write for InteractiveTextStream {
         self.inner.write_all(buf)
     }
 
-    #[cfg(feature = "nightly")]
+    #[cfg(write_all_vectored)]
     #[inline]
     fn write_all_vectored(&mut self, bufs: &mut [IoSlice<'_>]) -> io::Result<()> {
         self.inner.write_all_vectored(bufs)
@@ -402,14 +394,59 @@ impl io::Write for InteractiveTextStream {
     }
 }
 
-impl Terminal for InteractiveTextStream {
-    fn color_support(&self) -> TerminalColorSupport {
-        self.color_support
+impl Terminal for InteractiveTextStream {}
+
+impl ReadTerminal for InteractiveTextStream {
+    #[inline]
+    fn is_line_by_line(&self) -> bool {
+        self.inner.is_line_by_line()
+    }
+
+    #[inline]
+    fn is_input_terminal(&self) -> bool {
+        self.inner.is_input_terminal()
     }
 }
 
-impl ReadWriteExt for InteractiveTextStream {}
-impl ReadWriteTerminal for InteractiveTextStream {}
+impl WriteTerminal for InteractiveTextStream {
+    #[inline]
+    fn color_support(&self) -> TerminalColorSupport {
+        self.inner.color_support()
+    }
+
+    #[inline]
+    fn color_preference(&self) -> bool {
+        self.inner.color_preference()
+    }
+
+    #[inline]
+    fn is_output_terminal(&self) -> bool {
+        self.inner.is_output_terminal()
+    }
+}
+
+impl InteractTerminal for InteractiveTextStream {}
+
+impl InteractExt for InteractiveTextStream {}
+
+impl Bufferable for InteractiveTextStream {
+    #[inline]
+    fn abandon(&mut self) {
+        self.inner.abandon()
+    }
+}
+
+impl ReadStr for InteractiveTextStream {
+    #[inline]
+    fn read_str(&mut self, buf: &mut str) -> io::Result<(usize, Status)> {
+        self.inner.read_str(buf)
+    }
+
+    #[inline]
+    fn read_exact_str(&mut self, buf: &mut str) -> io::Result<()> {
+        self.inner.read_exact_str(buf)
+    }
+}
 
 impl Debug for InteractiveTextStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

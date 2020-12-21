@@ -1,16 +1,17 @@
 use crate::{path_to_name::path_to_name, Pseudonym, Type};
 use anyhow::anyhow;
 use flate2::{write::GzEncoder, Compression};
-use io_ext::{Status, WriteExt};
-use io_ext_adapters::StdWriter;
-use raw_stdio::RawStdout;
+use io_ext::{Bufferable, WriteExt};
+use io_ext_adapters::ExtWriter;
+use io_handles::WriteHandle;
 use std::{
     fmt::{self, Arguments, Debug, Formatter},
     fs::File,
-    io::{self, IoSlice},
+    io::{self, IoSlice, Write},
     path::Path,
     str::FromStr,
 };
+use terminal_support::NeverTerminalWriter;
 use url::Url;
 
 /// An output stream for binary output.
@@ -41,19 +42,21 @@ use url::Url;
 /// output implicitly.
 pub struct OutputByteStream {
     name: String,
-    writer: Box<dyn WriteExt>,
+    writer: ExtWriter<NeverTerminalWriter<WriteHandle>>,
     type_: Type,
 }
 
 impl OutputByteStream {
     /// Write the given `Pseudonym` to the output stream.
+    #[inline]
     pub fn write_pseudonym(&mut self, pseudonym: &Pseudonym) -> io::Result<()> {
-        io::Write::write_all(self, pseudonym.name.as_bytes())
+        Write::write_all(self, pseudonym.name.as_bytes())
     }
 
     /// Write the name of the given output stream to the output stream. This is
     /// needed because the name of an `OutputByteStream` is not available in
     /// the public API.
+    #[inline]
     pub fn pseudonym(&self) -> Pseudonym {
         Pseudonym::new(self.name.clone())
     }
@@ -61,8 +64,15 @@ impl OutputByteStream {
     /// If the output stream metadata implies a particular media type, also
     /// known as MIME type, return it. Some output streams know their type,
     /// though many do not.
+    #[inline]
     pub fn type_(&self) -> &Type {
         &self.type_
+    }
+
+    /// Used by `OutputTextStream` to convert from `OutputByteStream`.
+    #[inline]
+    pub(crate) fn into_parts(self) -> (String, ExtWriter<NeverTerminalWriter<WriteHandle>>, Type) {
+        (self.name, self.writer, self.type_)
     }
 
     fn from_str(s: &str) -> Result<Self, anyhow::Error> {
@@ -86,19 +96,13 @@ impl OutputByteStream {
         Self::from_path(Path::new(s))
     }
 
-    pub(crate) fn from_writer(name: String, writer: Box<dyn WriteExt>, type_: Type) -> Self {
-        Self {
-            name,
-            writer,
-            type_,
-        }
-    }
-
     /// Return an output byte stream representing standard output.
     pub fn stdout(type_: Type) -> anyhow::Result<Self> {
-        let stdout =
-            RawStdout::new().ok_or_else(|| anyhow!("attempted to open stdout multiple times"))?;
+        let stdout = WriteHandle::stdout()?;
 
+        // fixme:
+        //   - don't do this when we're called from OutputTextStream
+        //   - do do this on other ttys (char devices, etc.)
         #[cfg(not(windows))]
         if posish::io::isatty(&stdout) {
             return Err(anyhow!("attempted to write binary output to a terminal"));
@@ -109,9 +113,11 @@ impl OutputByteStream {
             return Err(anyhow!("attempted to write binary output to a terminal"));
         }
 
+        let writer = NeverTerminalWriter::new(stdout);
+        let writer = ExtWriter::new(writer);
         Ok(Self {
             name: "-".to_owned(),
-            writer: Box::new(stdout),
+            writer,
             type_,
         })
     }
@@ -154,16 +160,23 @@ impl OutputByteStream {
             let path = path.with_extension("");
             let type_ = Type::from_extension(path.extension());
             // 6 is the default gzip compression level.
+            let writer =
+                WriteHandle::piped_thread(Box::new(GzEncoder::new(file, Compression::new(6))))?;
+            let writer = NeverTerminalWriter::new(writer);
+            let writer = ExtWriter::new(writer);
             Ok(Self {
                 name,
-                writer: Box::new(StdWriter::new(GzEncoder::new(file, Compression::new(6)))),
+                writer,
                 type_,
             })
         } else {
             let type_ = Type::from_extension(path.extension());
+            let writer = WriteHandle::file(file);
+            let writer = NeverTerminalWriter::new(writer);
+            let writer = ExtWriter::new(writer);
             Ok(Self {
                 name,
-                writer: Box::new(StdWriter::new(file)),
+                writer,
                 type_,
             })
         }
@@ -185,9 +198,12 @@ impl OutputByteStream {
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
             .spawn()?;
+        let writer = WriteHandle::child_stdin(child.stdin.unwrap());
+        let writer = NeverTerminalWriter::new(writer);
+        let writer = ExtWriter::new(writer);
         Ok(Self {
             name: s.to_owned(),
-            writer: Box::new(StdWriter::new(child.stdin.unwrap())),
+            writer,
             type_: Type::unknown(),
         })
     }
@@ -209,13 +225,8 @@ impl FromStr for OutputByteStream {
 
 impl WriteExt for OutputByteStream {
     #[inline]
-    fn flush_with_status(&mut self, status: Status) -> io::Result<()> {
-        self.writer.flush_with_status(status)
-    }
-
-    #[inline]
-    fn abandon(&mut self) {
-        self.writer.abandon()
+    fn end(&mut self) -> io::Result<()> {
+        self.writer.end()
     }
 
     #[inline]
@@ -224,7 +235,7 @@ impl WriteExt for OutputByteStream {
     }
 }
 
-impl io::Write for OutputByteStream {
+impl Write for OutputByteStream {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.writer.write(buf)
@@ -240,7 +251,7 @@ impl io::Write for OutputByteStream {
         self.writer.write_vectored(bufs)
     }
 
-    #[cfg(feature = "nightly")]
+    #[cfg(can_vector)]
     #[inline]
     fn is_write_vectored(&self) -> bool {
         self.writer.is_write_vectored()
@@ -251,7 +262,7 @@ impl io::Write for OutputByteStream {
         self.writer.write_all(buf)
     }
 
-    #[cfg(feature = "nightly")]
+    #[cfg(write_all_vectored)]
     #[inline]
     fn write_all_vectored(&mut self, bufs: &mut [IoSlice<'_>]) -> io::Result<()> {
         self.writer.write_all_vectored(bufs)
@@ -263,10 +274,18 @@ impl io::Write for OutputByteStream {
     }
 }
 
+impl Bufferable for OutputByteStream {
+    #[inline]
+    fn abandon(&mut self) {
+        self.writer.abandon()
+    }
+}
+
 impl Debug for OutputByteStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // Don't print the name here, as that's an implementation detail.
         let mut b = f.debug_struct("OutputByteStream");
+        b.field("type_", &self.type_);
         b.finish()
     }
 }

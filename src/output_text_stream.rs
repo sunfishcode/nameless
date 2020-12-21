@@ -1,26 +1,21 @@
 #[cfg(unix)]
 use crate::summon_bat::summon_bat;
-use crate::{path_to_name::path_to_name, OutputByteStream, Pseudonym, Type};
-use anyhow::anyhow;
-use flate2::{write::GzEncoder, Compression};
-use io_ext::{default_flush, Status, WriteExt};
-use io_ext_adapters::StdWriter;
-use raw_stdio::RawStdout;
+use crate::{OutputByteStream, Pseudonym, Type};
+use io_ext::{Bufferable, WriteExt};
+use io_ext_adapters::ExtWriter;
+use io_handles::WriteHandle;
 #[cfg(all(not(unix), not(windows)))]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawHandle, FromRawHandle};
 use std::{
     fmt::{self, Arguments, Debug, Formatter},
-    fs::File,
-    io::{self, IoSlice},
-    path::Path,
+    io::{self, IoSlice, Write},
     process::{exit, Child},
     str::FromStr,
 };
-use terminal_support::{detect_terminal_color_support, Terminal, TerminalColorSupport};
+use terminal_support::{Terminal, TerminalColorSupport, TerminalWriter, WriteTerminal};
 use text_streams::TextWriter;
-use url::Url;
 
 /// An output stream for plain text output.
 ///
@@ -49,186 +44,82 @@ use url::Url;
 /// `std::io::stdout`, `std::println`, or anything else which uses standard
 /// output implicitly.
 pub struct OutputTextStream {
-    inner: OutputByteStream,
-    stdout_helper_child: Option<(Child, RawStdout)>,
-    color_support: TerminalColorSupport,
+    name: String,
+    writer: TextWriter<ExtWriter<TerminalWriter<WriteHandle>>>,
+    type_: Type,
+    stdout_helper_child: Option<Child>,
 }
 
 impl OutputTextStream {
     /// Write the given `Pseudonym` to the output stream.
+    #[inline]
     pub fn write_pseudonym(&mut self, pseudonym: &Pseudonym) -> io::Result<()> {
-        self.inner.write_pseudonym(pseudonym)
+        Write::write_all(self, pseudonym.name.as_bytes())
     }
 
     /// Write the name of the given output stream to the output stream. This is
     /// needed because the name of an `OutputTextStream` is not available in
     /// the public API.
+    #[inline]
     pub fn pseudonym(&self) -> Pseudonym {
-        self.inner.pseudonym()
+        Pseudonym::new(self.name.clone())
     }
 
     /// If the output stream metadata implies a particular media type, also
     /// known as MIME type, return it. Otherwise default to
     /// "text/plain; charset=utf-8".
+    #[inline]
     pub fn type_(&self) -> &Type {
-        self.inner.type_()
-    }
-
-    /// FIXME: dedup some of this with bytestream?
-    fn from_str(s: &str) -> Result<Self, anyhow::Error> {
-        // If we can parse it as a URL, treat it as such.
-        if let Ok(url) = Url::parse(s) {
-            return Self::from_url(url);
-        }
-
-        // Special-case "-" to mean stdout.
-        if s == "-" {
-            return Self::stdout(Type::text());
-        }
-
-        // Strings beginning with "$(" are commands.
-        #[cfg(not(windows))]
-        if s.starts_with("$(") {
-            return Self::from_child(s);
-        }
-
-        // Otherwise try opening it as a path in the filesystem namespace.
-        Self::from_path(Path::new(s))
+        &self.type_
     }
 
     /// Return an output byte stream representing standard output.
     pub fn stdout(type_: Type) -> anyhow::Result<Self> {
-        let stdout =
-            RawStdout::new().ok_or_else(|| anyhow!("attempted to open stdout multiple times"))?;
+        let name = "-".to_owned();
+        let writer = WriteHandle::stdout()?;
+        let writer = TerminalWriter::with_handle(writer);
+        let writer = ExtWriter::new(writer);
+        let writer = TextWriter::with_ansi_color_output(writer);
 
         #[cfg(unix)]
-        let color_support = {
-            let (_isatty, color_support, stdout_helper_child) = summon_bat(&stdout, &type_)?;
+        {
+            let stdout_helper_child = summon_bat(&writer, &type_)?;
 
             if let Some(mut stdout_helper_child) = stdout_helper_child {
-                let output = StdWriter::new(stdout_helper_child.stdin.take().unwrap());
-                let output = TextWriter::with_ansi_color(
-                    output,
-                    color_support != TerminalColorSupport::Monochrome,
-                );
+                let writer = WriteHandle::child_stdin(stdout_helper_child.stdin.take().unwrap());
+                let writer = TerminalWriter::with_handle(writer);
+                let writer = ExtWriter::new(writer);
+                let writer = TextWriter::with_ansi_color_output(writer);
 
                 return Ok(Self {
-                    inner: OutputByteStream::from_writer("-".to_owned(), Box::new(output), type_),
-                    stdout_helper_child: Some((stdout_helper_child, stdout)),
-                    color_support,
+                    name,
+                    writer,
+                    type_,
+                    stdout_helper_child: Some(stdout_helper_child),
                 });
             }
-
-            color_support
-        };
-
-        #[cfg(all(not(unix), not(windows)))]
-        let (_isatty, color_support) =
-            detect_terminal_color_support(&std::mem::ManuallyDrop::new(unsafe {
-                File::from_raw_fd(stdout.as_raw_fd())
-            }));
-
-        #[cfg(windows)]
-        let (_isatty, color_support) =
-            detect_terminal_color_support(&std::mem::ManuallyDrop::new(unsafe {
-                File::from_raw_handle(stdout.as_raw_handle())
-            }));
-
-        let stdout =
-            TextWriter::with_ansi_color(stdout, color_support != TerminalColorSupport::Monochrome);
+        }
 
         Ok(Self {
-            inner: OutputByteStream::from_writer("-".to_owned(), Box::new(stdout), type_),
+            name,
+            writer,
+            type_,
             stdout_helper_child: None,
-            color_support,
         })
     }
 
-    /// Construct a new instance from a URL.
-    fn from_url(url: Url) -> anyhow::Result<Self> {
-        match url.scheme() {
-            // TODO: POST the data to HTTP? But the `Write` trait makes this
-            // tricky because there's no hook for closing and finishing the
-            // stream. `Drop` can't fail.
-            "http" | "https" => Err(anyhow!("output to HTTP not supported yet")),
-            "file" => {
-                if !url.username().is_empty()
-                    || url.password().is_some()
-                    || url.has_host()
-                    || url.port().is_some()
-                    || url.query().is_some()
-                    || url.fragment().is_some()
-                {
-                    return Err(anyhow!("file URL should only contain a path"));
-                }
-                // TODO: https://docs.rs/url/latest/url/struct.Url.html#method.to_file_path
-                // is ambiguous about how it can fail. What is `Path::new_opt`?
-                Self::from_path(
-                    &url.to_file_path()
-                        .map_err(|_: ()| anyhow!("unknown file URL weirdness"))?,
-                )
-            }
-            "data" => Err(anyhow!("output to data URL isn't possible")),
-            other => Err(anyhow!("unsupported URL scheme \"{}\"", other)),
-        }
-    }
-
-    /// Construct a new instance from a plain filesystem path.
-    fn from_path(path: &Path) -> anyhow::Result<Self> {
-        let name = path_to_name("file", path)?;
-        let file = File::create(path).map_err(|err| anyhow!("{}: {}", path.display(), err))?;
-        if path.extension() == Some(Path::new("gz").as_os_str()) {
-            // TODO: We shouldn't really need to allocate a `PathBuf` here.
-            let path = path.with_extension("");
-            let type_ = Type::from_extension(path.extension());
-            // 6 is the default gzip compression level.
-            let writer = StdWriter::new(GzEncoder::new(file, Compression::new(6)));
-            let writer = TextWriter::new(writer);
-            Ok(Self {
-                inner: OutputByteStream::from_writer(name, Box::new(writer), type_),
-                stdout_helper_child: None,
-                color_support: TerminalColorSupport::default(),
-            })
-        } else {
-            let type_ = Type::from_extension(path.extension());
-            // Even though we opened this from the filesystem, it might be a
-            // character device and might have color support.
-            let (_isatty, color_support) = detect_terminal_color_support(&file);
-            let writer = StdWriter::new(file);
-            let writer = TextWriter::with_ansi_color(
-                writer,
-                color_support != TerminalColorSupport::Monochrome,
-            );
-            Ok(Self {
-                inner: OutputByteStream::from_writer(name, Box::new(writer), type_),
-                stdout_helper_child: None,
-                color_support,
-            })
-        }
-    }
-
-    #[cfg(not(windows))]
-    fn from_child(s: &str) -> anyhow::Result<Self> {
-        use std::process::{Command, Stdio};
-        assert!(s.starts_with("$("));
-        if !s.ends_with(')') {
-            return Err(anyhow!("child string must end in ')'"));
-        }
-        let words = shell_words::split(&s[2..s.len() - 1])?;
-        let (first, rest) = words
-            .split_first()
-            .ok_or_else(|| anyhow!("child stream specified with '(...)' must contain a command"))?;
-        let child = Command::new(first)
-            .args(rest)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .spawn()?;
-        let writer = StdWriter::new(child.stdin.unwrap());
+    fn from_str(s: &str) -> anyhow::Result<Self> {
+        let writer = OutputByteStream::from_str(s)?;
+        let (name, writer, type_) = writer.into_parts();
+        let writer = writer.abandon_into_inner().unwrap().into_inner();
+        let writer = TerminalWriter::with_handle(writer);
+        let writer = ExtWriter::new(writer);
         let writer = TextWriter::new(writer);
         Ok(Self {
-            inner: OutputByteStream::from_writer(s.to_owned(), Box::new(writer), Type::unknown()),
+            name,
+            writer,
+            type_,
             stdout_helper_child: None,
-            color_support: TerminalColorSupport::default(),
         })
     }
 }
@@ -249,95 +140,100 @@ impl FromStr for OutputTextStream {
 
 impl WriteExt for OutputTextStream {
     #[inline]
-    fn flush_with_status(&mut self, status: Status) -> io::Result<()> {
-        self.inner.flush_with_status(status)?;
+    fn end(&mut self) -> io::Result<()> {
+        self.writer.end()?;
 
-        if let Status::End = status {
-            if let Some((mut stdout_helper_child, _raw_stdout)) = self.stdout_helper_child.take() {
-                // Close standard output, prompting the child process to exit.
-                self.inner = OutputByteStream::from_writer(
-                    "-".to_owned(),
-                    Box::new(Vec::new()),
-                    self.inner.type_().clone(),
-                );
-
-                stdout_helper_child.wait()?;
-            }
+        if let Some(mut stdout_helper_child) = self.stdout_helper_child.take() {
+            stdout_helper_child.wait()?;
         }
 
         Ok(())
     }
 
     #[inline]
-    fn abandon(&mut self) {
-        self.inner.abandon()
-    }
-
-    #[inline]
     fn write_str(&mut self, buf: &str) -> io::Result<()> {
-        self.inner.write_str(buf)
+        self.writer.write_str(buf)
     }
 }
 
-impl io::Write for OutputTextStream {
+impl Write for OutputTextStream {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.write(buf)
+        self.writer.write(buf)
     }
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        default_flush(self)
+        self.writer.flush()
     }
 
     #[inline]
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.inner.write_vectored(bufs)
+        self.writer.write_vectored(bufs)
     }
 
-    #[cfg(feature = "nightly")]
+    #[cfg(can_vector)]
     #[inline]
     fn is_write_vectored(&self) -> bool {
-        self.inner.is_write_vectored()
+        self.writer.is_write_vectored()
     }
 
     #[inline]
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        self.inner.write_all(buf)
+        self.writer.write_all(buf)
     }
 
-    #[cfg(feature = "nightly")]
+    #[cfg(write_all_vectored)]
     #[inline]
     fn write_all_vectored(&mut self, bufs: &mut [IoSlice<'_>]) -> io::Result<()> {
-        self.inner.write_all_vectored(bufs)
+        self.writer.write_all_vectored(bufs)
     }
 
     #[inline]
     fn write_fmt(&mut self, fmt: Arguments<'_>) -> io::Result<()> {
-        self.inner.write_fmt(fmt)
+        self.writer.write_fmt(fmt)
     }
 }
 
-impl Terminal for OutputTextStream {
+impl Bufferable for OutputTextStream {
+    #[inline]
+    fn abandon(&mut self) {
+        self.writer.abandon()
+    }
+}
+
+impl Terminal for OutputTextStream {}
+
+impl WriteTerminal for OutputTextStream {
+    #[inline]
     fn color_support(&self) -> TerminalColorSupport {
-        self.color_support
+        self.writer.color_support()
+    }
+
+    #[inline]
+    fn color_preference(&self) -> bool {
+        self.writer.color_preference()
+    }
+
+    #[inline]
+    fn is_output_terminal(&self) -> bool {
+        self.writer.is_output_terminal()
     }
 }
 
 impl Drop for OutputTextStream {
     fn drop(&mut self) {
-        if let Some((mut stdout_helper_child, _raw_stdout)) = self.stdout_helper_child.take() {
+        if let Some(mut stdout_helper_child) = self.stdout_helper_child.take() {
             // Wait for the child. We can't return `Err` from a `drop` function,
-            // so just print a message and return. Callers should use
-            // `flush_with_status(Status::End)` to declare the end of the stream
-            // if they wish to avoid these errors.
+            // so just print a message and exit. Callers should use
+            // `end()` to declare the end of the stream if they wish to avoid
+            // these errors.
 
             // Close standard output, prompting the child process to exit.
-            self.inner = OutputByteStream::from_writer(
-                "-".to_owned(),
-                Box::new(Vec::new()),
-                self.inner.type_().clone(),
-            );
+            if let Err(e) = self.writer.end() {
+                eprintln!("Output formatting process encountered error: {:?}", e);
+                exit(libc::EXIT_FAILURE);
+            }
 
             match stdout_helper_child.wait() {
                 Ok(status) => {
@@ -363,7 +259,7 @@ impl Debug for OutputTextStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // Don't print the name here, as that's an implementation detail.
         let mut b = f.debug_struct("OutputTextStream");
-        b.field("inner", &self.inner);
+        b.field("type_", &self.type_);
         b.finish()
     }
 }

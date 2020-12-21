@@ -9,6 +9,17 @@
 //! [entered "world"]
 //! ```
 //!
+//! Run it interactively with the process' tty. This works the same way, but
+//! doesn't detect terminal colors, because we need the "TERM" environment
+//! variable to do that.
+//! ```
+//! $ cargo run --quiet --example repl /dev/tty
+//! prompt> hello
+//! [entered "hello"]
+//! prompt> world
+//! [entered "world"]
+//! ```
+//!
 //! Run it piped to a client process:
 //! ```
 //! $ cargo run --quiet --example repl '$(cargo run --quiet --example repl-client -)'
@@ -32,9 +43,11 @@
 //! [entered "world"]
 //! ```
 
-use nameless::{BufReaderLineWriter, InteractiveTextStream};
+use io_ext::Bufferable;
+use io_handles::BufReaderLineWriter;
+use nameless::InteractiveTextStream;
 use std::io::{self, BufRead, Write};
-use terminal_support::{Terminal, TerminalColorSupport};
+use terminal_support::{TerminalColorSupport, WriteTerminal};
 
 #[kommand::main]
 fn main(io: InteractiveTextStream) -> anyhow::Result<()> {
@@ -62,13 +75,13 @@ fn repl(mut io: BufReaderLineWriter<InteractiveTextStream>, color: bool) -> io::
         }
 
         if io.read_line(&mut s)? == 0 {
-            // Tidy up the terminal.
-            write!(io, "\n")?;
             // End of stream.
+            io.abandon();
             return Ok(());
         }
 
         if s.trim() == "exit" {
+            io.abandon();
             return Ok(());
         }
 
