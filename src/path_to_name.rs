@@ -77,7 +77,7 @@ fn test_path_to_name() {
         "file:///foo%3Abar"
     );
     assert_eq!(path_to_name("file", Path::new("foo")).unwrap(), "foo");
-    // FIXME: Redo how relative paths are handled.
+    // TODO: Redo how relative paths are handled.
     // assert_eq!(path_to_name("file", Path::new("./foo")).unwrap(), "./foo");
     // assert_eq!(
     //    path_to_name("file", OsStr::from_bytes(b"f\xffoo").as_ref()).unwrap(),
