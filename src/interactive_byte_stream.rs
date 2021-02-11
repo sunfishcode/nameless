@@ -1,28 +1,20 @@
-#[cfg(not(windows))]
-use crate::path_to_name::path_to_name;
+use crate::open_interactive::{open_interactive, Interactive};
 use crate::Pseudonym;
-use anyhow::anyhow;
-use char_device::CharDevice;
 use duplex::Duplex;
 use io_streams::StreamDuplexer;
 use layered_io::{
     default_read, default_read_to_end, default_read_to_string, default_read_vectored, Bufferable,
     LayeredDuplexer, ReadLayered, Status, WriteLayered,
 };
-#[cfg(unix)]
-use std::os::unix::net::{UnixListener, UnixStream};
 use std::{
     fmt::{self, Arguments, Debug, Formatter},
     io::{self, IoSlice, IoSliceMut, Read, Write},
-    net::{TcpListener, TcpStream},
-    path::Path,
     str::FromStr,
 };
 use terminal_io::{
     DuplexTerminal, NeverTerminalDuplexer, ReadTerminal, Terminal, TerminalColorSupport,
     WriteTerminal,
 };
-use url::Url;
 
 /// An `InteractiveByteStream` implements `Read` and `Write` as is meant
 /// to be used with interactive streams.
@@ -51,199 +43,13 @@ impl InteractiveByteStream {
         Pseudonym::new(self.name.clone())
     }
 
-    /// Used by `InteractiveTextStream` to convert from `InteractiveByteStream`.
-    #[inline]
-    pub(crate) fn into_parts(
-        self,
-    ) -> (
-        String,
-        LayeredDuplexer<NeverTerminalDuplexer<StreamDuplexer>>,
-    ) {
-        (self.name, self.duplexer)
-    }
-
-    fn from_str(s: &str) -> Result<Self, anyhow::Error> {
-        // If we can parse it as a URL, treat it as such.
-        if let Ok(url) = Url::parse(s) {
-            return Self::from_url(url);
-        }
-
-        // Special-case "-" to mean (stdin, stdout).
-        if s == "-" {
-            return Self::stdin_stdout();
-        }
-
-        // Strings beginning with "$(" are commands.
-        #[cfg(not(windows))]
-        if s.starts_with("$(") {
-            return Self::from_child(s);
-        }
-
-        // Otherwise try opening it as a path in the filesystem namespace.
-        Self::from_path(Path::new(s))
-    }
-
-    /// Return an interactive byte stream representing standard input and standard output.
-    pub fn stdin_stdout() -> anyhow::Result<Self> {
-        let duplexer = StreamDuplexer::stdin_stdout()?;
-        let duplexer = NeverTerminalDuplexer::new(duplexer);
+    fn from_interactive(interactive: Interactive) -> Self {
+        let duplexer = NeverTerminalDuplexer::new(interactive.duplexer);
         let duplexer = LayeredDuplexer::new(duplexer);
-        Ok(Self {
-            name: "-".to_owned(),
+        Self {
+            name: interactive.name,
             duplexer,
-        })
-    }
-
-    /// Construct a new instance from a URL.
-    fn from_url(url: Url) -> anyhow::Result<Self> {
-        match url.scheme() {
-            "connect" => Self::from_connect_url_str(url),
-            "accept" => Self::from_accept_url_str(url),
-            scheme @ "http" | scheme @ "https" | scheme @ "file" | scheme @ "data" => {
-                Err(anyhow!("non-interactive URL scheme \"{}\"", scheme))
-            }
-            other => Err(anyhow!("unsupported URL scheme \"{}\"", other)),
         }
-    }
-
-    fn from_connect_url_str(url: Url) -> anyhow::Result<Self> {
-        if !url.username().is_empty()
-            || url.password().is_some()
-            || url.query().is_some()
-            || url.fragment().is_some()
-        {
-            return Err(anyhow!("connect URL should only contain a socket address"));
-        }
-
-        if url.path().is_empty() {
-            let port = match url.port() {
-                Some(port) => port,
-                None => return Err(anyhow!("TCP connect URL should have a port")),
-            };
-            let host_str = match url.host_str() {
-                Some(host_str) => host_str,
-                None => return Err(anyhow!("TCP connect URL should have a host")),
-            };
-
-            let duplexer = TcpStream::connect(format!("{}:{}", host_str, port))?;
-            let duplexer = StreamDuplexer::tcp_stream(duplexer);
-            let duplexer = NeverTerminalDuplexer::new(duplexer);
-            let duplexer = LayeredDuplexer::new(duplexer);
-
-            return Ok(Self {
-                name: url.to_string(),
-                duplexer,
-            });
-        }
-
-        #[cfg(unix)]
-        {
-            if url.port().is_some() || url.host_str().is_some() {
-                return Err(anyhow!(
-                    "Unix-domain connect URL should only contain a path"
-                ));
-            }
-
-            let duplexer = UnixStream::connect(url.path())?;
-            let duplexer = StreamDuplexer::unix_stream(duplexer);
-            let duplexer = NeverTerminalDuplexer::new(duplexer);
-            let duplexer = LayeredDuplexer::new(duplexer);
-
-            return Ok(Self {
-                name: url.to_string(),
-                duplexer,
-            });
-        }
-
-        #[cfg(windows)]
-        return Err(anyhow!("Unsupported connect URL: {}", url));
-    }
-
-    fn from_accept_url_str(url: Url) -> anyhow::Result<Self> {
-        if !url.username().is_empty()
-            || url.password().is_some()
-            || url.query().is_some()
-            || url.fragment().is_some()
-        {
-            return Err(anyhow!("accept URL should only contain a socket address"));
-        }
-
-        if url.path().is_empty() {
-            let port = match url.port() {
-                Some(port) => port,
-                None => return Err(anyhow!("accept URL should have a port")),
-            };
-            let host_str = match url.host_str() {
-                Some(host_str) => host_str,
-                None => return Err(anyhow!("accept URL should have a host")),
-            };
-
-            let listener = TcpListener::bind(format!("{}:{}", host_str, port))?;
-
-            let (duplexer, addr) = listener.accept()?;
-            let duplexer = StreamDuplexer::tcp_stream(duplexer);
-            let duplexer = NeverTerminalDuplexer::new(duplexer);
-            let duplexer = LayeredDuplexer::new(duplexer);
-
-            return Ok(Self {
-                name: format!("accept://{}", addr),
-                duplexer,
-            });
-        }
-
-        #[cfg(unix)]
-        {
-            if url.port().is_some() || url.host_str().is_some() {
-                return Err(anyhow!(
-                    "Unix-domain connect URL should only contain a path"
-                ));
-            }
-
-            let listener = UnixListener::bind(url.path())?;
-
-            let (duplexer, addr) = listener.accept()?;
-            let duplexer = StreamDuplexer::unix_stream(duplexer);
-            let duplexer = NeverTerminalDuplexer::new(duplexer);
-            let duplexer = LayeredDuplexer::new(duplexer);
-
-            let name = path_to_name("accept", addr.as_pathname().unwrap())?;
-
-            return Ok(Self { name, duplexer });
-        }
-
-        #[cfg(windows)]
-        return Err(anyhow!("Unsupported connect URL: {}", url));
-    }
-
-    /// Construct a new instance from a plain filesystem path.
-    fn from_path(path: &Path) -> anyhow::Result<Self> {
-        let name = path_to_name("file", path)?;
-        let duplexer = CharDevice::open(path)?;
-        let duplexer = StreamDuplexer::char_device(duplexer);
-        let duplexer = NeverTerminalDuplexer::new(duplexer);
-        let duplexer = LayeredDuplexer::new(duplexer);
-        Ok(Self { name, duplexer })
-    }
-
-    #[cfg(not(windows))]
-    fn from_child(s: &str) -> anyhow::Result<Self> {
-        assert!(s.starts_with("$("));
-        if !s.ends_with(')') {
-            return Err(anyhow!("child string must end in ')'"));
-        }
-        let words = shell_words::split(&s[2..s.len() - 1])?;
-        let (first, rest) = words
-            .split_first()
-            .ok_or_else(|| anyhow!("child stream specified with '(...)' must contain a command"))?;
-        let mut command = std::process::Command::new(first);
-        command.args(rest);
-        let duplexer = StreamDuplexer::duplex_with_command(command)?;
-        let duplexer = NeverTerminalDuplexer::new(duplexer);
-        let duplexer = LayeredDuplexer::new(duplexer);
-        Ok(Self {
-            name: s.to_owned(),
-            duplexer,
-        })
     }
 }
 
@@ -257,7 +63,7 @@ impl FromStr for InteractiveByteStream {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self> {
-        Self::from_str(s)
+        open_interactive(s).map(Self::from_interactive)
     }
 }
 

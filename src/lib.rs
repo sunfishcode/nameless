@@ -147,6 +147,7 @@ mod interactive_byte_stream;
 mod interactive_text_stream;
 mod lazy_output;
 mod open_input;
+mod open_interactive;
 mod open_output;
 mod output_byte_stream;
 mod output_text_stream;
