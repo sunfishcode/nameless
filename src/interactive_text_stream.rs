@@ -1,5 +1,7 @@
-use crate::{Pseudonym};
-use crate::open_interactive::{open_interactive, Interactive};
+use crate::{
+    open_interactive::{open_interactive, Interactive},
+    Pseudonym,
+};
 use basic_text::TextDuplexer;
 use duplex::Duplex;
 use io_streams::StreamDuplexer;
