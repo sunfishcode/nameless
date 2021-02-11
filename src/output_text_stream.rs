@@ -107,10 +107,11 @@ impl OutputTextStream {
         let writer = LayeredWriter::new(terminal);
         let writer = Utf8Writer::new(writer);
         let writer = TextWriter::with_ansi_color_output(writer);
+        let type_ = output.type_.merge(Type::text());
         Self {
             name: output.name,
             writer,
-            type_: output.type_,
+            type_,
             helper_child: None,
         }
     }

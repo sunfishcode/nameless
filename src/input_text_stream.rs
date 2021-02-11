@@ -77,10 +77,11 @@ impl InputTextStream {
         let reader = LayeredReader::new(reader);
         let reader = Utf8Reader::new(reader);
         let reader = TextReader::new(reader);
+        let type_ = input.type_.merge(Type::text());
         Self {
             name: input.name,
             reader,
-            type_: input.type_,
+            type_,
             initial_size: input.initial_size,
         }
     }
