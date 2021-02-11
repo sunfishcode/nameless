@@ -127,7 +127,6 @@ impl FromStr for OutputTextStream {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self> {
-        // fixme: we'd ideally like to have some way to pass in a type.
         open_output(s, Type::text()).map(Self::from_output)
     }
 }
