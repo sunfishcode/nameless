@@ -1,13 +1,15 @@
 //! A simple cat-like program using `kommand` and `InputTextStream`.
 //! Unlike regular cat, this cat supports URLs and gzip. Meow!
 
+use basic_text::copy_text;
 use itertools::Itertools;
-use nameless::{InputTextStream, OutputTextStream, Type};
-use text_formats::copy_text;
+use nameless::{InputTextStream, LazyOutput, OutputTextStream, Type};
 
 #[rustfmt::skip] // TODO: rustfmt mishandles doc comments on arguments
 #[kommand::main]
 fn main(
+    output: LazyOutput<OutputTextStream>,
+
     /// Input sources, stdin if none.
     inputs: Vec<InputTextStream>
 ) -> anyhow::Result<()> {
@@ -16,7 +18,7 @@ fn main(
         _ => Type::text(),
     };
 
-    let mut output = OutputTextStream::stdout(type_)?;
+    let mut output = output.materialize(type_)?;
 
     for mut input in inputs {
         copy_text(&mut input, &mut output)?;

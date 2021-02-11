@@ -109,8 +109,8 @@
 //! [`BufReader`]: https://doc.rust-lang.org/std/io/struct.BufReader.html
 //! [`BufWriter`]: https://doc.rust-lang.org/std/io/struct.BufWriter.html
 //! [`LineWriter`]: https://doc.rust-lang.org/std/io/struct.LineWriter.html
-//! [`BufInteractor`]: https://docs.rs/io-handles/latest/io_handles/struct.BufInteractor.html
-//! [`BufReaderLineWriter`]: https://docs.rs/io-handles/latest/io_handles/struct.BufReaderLineWriter.html
+//! [`BufInteractor`]: https://docs.rs/io-streams/latest/io_streams/struct.BufDuplexer.html
+//! [`BufReaderLineWriter`]: https://docs.rs/io-streams/latest/io_streams/struct.BufReaderLineWriter.html
 //! [`Regex`]: https://docs.rs/regex/latest/regex/struct.Regex.html
 //! [`Duration`]: https://docs.rs/humantime/latest/humantime/struct.Duration.html
 //! [the examples directory]: examples
@@ -143,7 +143,6 @@ pub use mime::Mime;
 
 mod input_byte_stream;
 mod input_text_stream;
-mod interact_terminal_ext;
 mod interactive_byte_stream;
 mod interactive_text_stream;
 mod lazy_output;

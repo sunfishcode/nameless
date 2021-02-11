@@ -1,8 +1,12 @@
+#[cfg(not(windows))]
+use crate::path_to_name::path_to_name;
 use crate::{InteractiveByteStream, Pseudonym};
 use anyhow::anyhow;
-use io_ext::{Bufferable, InteractExt, ReadExt, Status, WriteExt};
-use io_ext_adapters::ExtInteractor;
-use io_handles::InteractHandle;
+use basic_text::TextDuplexer;
+use char_device::CharDevice;
+use duplex::Duplex;
+use io_streams::StreamDuplexer;
+use layered_io::{Bufferable, LayeredDuplexer, ReadLayered, Status, WriteLayered};
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 #[cfg(windows)]
@@ -14,14 +18,11 @@ use std::{
     path::Path,
     str::FromStr,
 };
-use terminal_support::{
-    InteractTerminal, ReadTerminal, Terminal, TerminalColorSupport, TerminalInteractor,
-    WriteTerminal,
+use terminal_io::{
+    DuplexTerminal, ReadTerminal, Terminal, TerminalColorSupport, TerminalDuplexer, WriteTerminal,
 };
-use text_formats::{ReadStr, TextInteractor};
 use url::Url;
-#[cfg(not(windows))]
-use {crate::path_to_name::path_to_name, std::fs::OpenOptions};
+use utf8_io::{ReadStr, ReadStrLayered, Utf8Duplexer, WriteStr};
 
 /// An `InteractiveTextStream` implements `Read` and `Write` as is meant
 /// to be used with interactive streams.
@@ -39,7 +40,7 @@ use {crate::path_to_name::path_to_name, std::fs::OpenOptions};
 ///    (stdin, stdout), on platforms whch support it.
 pub struct InteractiveTextStream {
     name: String,
-    inner: TextInteractor<ExtInteractor<TerminalInteractor<InteractHandle>>>,
+    inner: TextDuplexer<Utf8Duplexer<LayeredDuplexer<TerminalDuplexer<StreamDuplexer>>>>,
 }
 
 impl InteractiveTextStream {
@@ -82,14 +83,15 @@ impl InteractiveTextStream {
     /// Return an interactive byte stream representing standard input and standard output.
     pub fn stdin_stdout() -> anyhow::Result<Self> {
         let stdin_stdout = InteractiveByteStream::stdin_stdout()?;
-        let (name, interactor) = stdin_stdout.into_parts();
-        let interactor = interactor.abandon_into_inner().unwrap().into_inner();
-        let interactor = TerminalInteractor::with_handle(interactor);
-        let interactor = ExtInteractor::new(interactor);
-        let interactor = TextInteractor::with_ansi_color_output(interactor);
+        let (name, duplexer) = stdin_stdout.into_parts();
+        let duplexer = duplexer.abandon_into_inner().unwrap().into_inner();
+        let duplexer = TerminalDuplexer::with_handle(duplexer);
+        let duplexer = LayeredDuplexer::new(duplexer);
+        let duplexer = Utf8Duplexer::new(duplexer);
+        let duplexer = TextDuplexer::with_ansi_color_output(duplexer);
         Ok(Self {
             name,
-            inner: interactor,
+            inner: duplexer,
         })
     }
 
@@ -124,15 +126,16 @@ impl InteractiveTextStream {
                 None => return Err(anyhow!("TCP connect URL should have a host")),
             };
 
-            let interactor = TcpStream::connect(format!("{}:{}", host_str, port))?;
-            let interactor = InteractHandle::tcp_stream(interactor);
-            let interactor = TerminalInteractor::generic(interactor);
-            let interactor = ExtInteractor::new(interactor);
-            let interactor = TextInteractor::new(interactor);
+            let duplexer = TcpStream::connect(format!("{}:{}", host_str, port))?;
+            let duplexer = StreamDuplexer::tcp_stream(duplexer);
+            let duplexer = TerminalDuplexer::generic(duplexer);
+            let duplexer = LayeredDuplexer::new(duplexer);
+            let duplexer = Utf8Duplexer::new(duplexer);
+            let duplexer = TextDuplexer::new(duplexer);
 
             return Ok(Self {
                 name: url.to_string(),
-                inner: interactor,
+                inner: duplexer,
             });
         }
 
@@ -144,15 +147,16 @@ impl InteractiveTextStream {
                 ));
             }
 
-            let interactor = UnixStream::connect(url.path())?;
-            let interactor = InteractHandle::unix_stream(interactor);
-            let interactor = TerminalInteractor::generic(interactor);
-            let interactor = ExtInteractor::new(interactor);
-            let interactor = TextInteractor::new(interactor);
+            let duplexer = UnixStream::connect(url.path())?;
+            let duplexer = StreamDuplexer::unix_stream(duplexer);
+            let duplexer = TerminalDuplexer::generic(duplexer);
+            let duplexer = LayeredDuplexer::new(duplexer);
+            let duplexer = Utf8Duplexer::new(duplexer);
+            let duplexer = TextDuplexer::new(duplexer);
 
             return Ok(Self {
                 name: url.to_string(),
-                inner: interactor,
+                inner: duplexer,
             });
         }
 
@@ -181,15 +185,16 @@ impl InteractiveTextStream {
 
             let listener = TcpListener::bind(format!("{}:{}", host_str, port))?;
 
-            let (interactor, addr) = listener.accept()?;
-            let interactor = InteractHandle::tcp_stream(interactor);
-            let interactor = TerminalInteractor::generic(interactor);
-            let interactor = ExtInteractor::new(interactor);
-            let interactor = TextInteractor::new(interactor);
+            let (duplexer, addr) = listener.accept()?;
+            let duplexer = StreamDuplexer::tcp_stream(duplexer);
+            let duplexer = TerminalDuplexer::generic(duplexer);
+            let duplexer = LayeredDuplexer::new(duplexer);
+            let duplexer = Utf8Duplexer::new(duplexer);
+            let duplexer = TextDuplexer::new(duplexer);
 
             return Ok(Self {
                 name: format!("accept://{}", addr),
-                inner: interactor,
+                inner: duplexer,
             });
         }
 
@@ -203,17 +208,18 @@ impl InteractiveTextStream {
 
             let listener = UnixListener::bind(url.path())?;
 
-            let (interactor, addr) = listener.accept()?;
-            let interactor = InteractHandle::unix_stream(interactor);
-            let interactor = TerminalInteractor::generic(interactor);
-            let interactor = ExtInteractor::new(interactor);
-            let interactor = TextInteractor::new(interactor);
+            let (duplexer, addr) = listener.accept()?;
+            let duplexer = StreamDuplexer::unix_stream(duplexer);
+            let duplexer = TerminalDuplexer::generic(duplexer);
+            let duplexer = LayeredDuplexer::new(duplexer);
+            let duplexer = Utf8Duplexer::new(duplexer);
+            let duplexer = TextDuplexer::new(duplexer);
 
             let name = path_to_name("accept", addr.as_pathname().unwrap())?;
 
             return Ok(Self {
                 name,
-                inner: interactor,
+                inner: duplexer,
             });
         }
 
@@ -224,29 +230,16 @@ impl InteractiveTextStream {
     /// Construct a new instance from a plain filesystem path.
     #[cfg(not(windows))]
     fn from_path(path: &Path) -> anyhow::Result<Self> {
-        use std::os::unix::fs::FileTypeExt;
-
         let name = path_to_name("file", path)?;
-        // TODO: Should we have our own error type?
-        let mut options = OpenOptions::new();
-        let file = options
-            .read(true)
-            .write(true)
-            .open(path)
-            .map_err(|err| anyhow!("{}: {}", path.display(), err))?;
-        let metadata = file.metadata()?;
-        if !metadata.file_type().is_char_device() {
-            return Err(anyhow!(
-                "path to interactive channel must be a character device"
-            ));
-        }
-        let interactor = InteractHandle::char_device(file);
-        let interactor = TerminalInteractor::with_handle(interactor);
-        let interactor = ExtInteractor::new(interactor);
-        let interactor = TextInteractor::new(interactor);
+        let duplexer = CharDevice::open(path)?;
+        let duplexer = StreamDuplexer::char_device(duplexer);
+        let duplexer = TerminalDuplexer::with_handle(duplexer);
+        let duplexer = LayeredDuplexer::new(duplexer);
+        let duplexer = Utf8Duplexer::new(duplexer);
+        let duplexer = TextDuplexer::new(duplexer);
         Ok(Self {
             name,
-            inner: interactor,
+            inner: duplexer,
         })
     }
 
@@ -270,13 +263,14 @@ impl InteractiveTextStream {
             .ok_or_else(|| anyhow!("child stream specified with '(...)' must contain a command"))?;
         let mut command = std::process::Command::new(first);
         command.args(rest);
-        let interactor = InteractHandle::interact_with_command(command)?;
-        let interactor = TerminalInteractor::generic(interactor);
-        let interactor = ExtInteractor::new(interactor);
-        let interactor = TextInteractor::new(interactor);
+        let duplexer = StreamDuplexer::duplex_with_command(command)?;
+        let duplexer = TerminalDuplexer::generic(duplexer);
+        let duplexer = LayeredDuplexer::new(duplexer);
+        let duplexer = Utf8Duplexer::new(duplexer);
+        let duplexer = TextDuplexer::new(duplexer);
         Ok(Self {
             name: s.to_owned(),
-            inner: interactor,
+            inner: duplexer,
         })
     }
 }
@@ -295,7 +289,7 @@ impl FromStr for InteractiveTextStream {
     }
 }
 
-impl ReadExt for InteractiveTextStream {
+impl ReadLayered for InteractiveTextStream {
     #[inline]
     fn read_with_status(&mut self, buf: &mut [u8]) -> io::Result<(usize, Status)> {
         self.inner.read_with_status(buf)
@@ -343,12 +337,14 @@ impl Read for InteractiveTextStream {
     }
 }
 
-impl WriteExt for InteractiveTextStream {
+impl WriteLayered for InteractiveTextStream {
     #[inline]
-    fn end(&mut self) -> io::Result<()> {
-        self.inner.end()
+    fn close(&mut self) -> io::Result<()> {
+        self.inner.close()
     }
+}
 
+impl WriteStr for InteractiveTextStream {
     #[inline]
     fn write_str(&mut self, buf: &str) -> io::Result<()> {
         self.inner.write_str(buf)
@@ -425,9 +421,9 @@ impl WriteTerminal for InteractiveTextStream {
     }
 }
 
-impl InteractTerminal for InteractiveTextStream {}
+impl DuplexTerminal for InteractiveTextStream {}
 
-impl InteractExt for InteractiveTextStream {}
+impl Duplex for InteractiveTextStream {}
 
 impl Bufferable for InteractiveTextStream {
     #[inline]
@@ -438,13 +434,25 @@ impl Bufferable for InteractiveTextStream {
 
 impl ReadStr for InteractiveTextStream {
     #[inline]
-    fn read_str(&mut self, buf: &mut str) -> io::Result<(usize, Status)> {
+    fn read_str(&mut self, buf: &mut str) -> io::Result<usize> {
         self.inner.read_str(buf)
     }
 
     #[inline]
     fn read_exact_str(&mut self, buf: &mut str) -> io::Result<()> {
         self.inner.read_exact_str(buf)
+    }
+}
+
+impl ReadStrLayered for InteractiveTextStream {
+    #[inline]
+    fn read_str_with_status(&mut self, buf: &mut str) -> io::Result<(usize, Status)> {
+        self.inner.read_str_with_status(buf)
+    }
+
+    #[inline]
+    fn read_exact_str_using_status(&mut self, buf: &mut str) -> io::Result<Status> {
+        self.inner.read_exact_str_using_status(buf)
     }
 }
 

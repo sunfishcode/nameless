@@ -15,25 +15,28 @@ rustc_version = "0.3.0"
 
 [dependencies]
 anyhow = "1.0.35"
+char-device = "0.1.0"
 data-url = "0.1.0"
 flate2 = "1.0.19"
-io-ext = { path = "../io-ext" }
-io-ext-adapters = { path = "../io-ext-adapters", features = ["terminal-support"] }
-io-handles = { path = "../io-handles", features = ["io-ext", "terminal-support"] }
+layered-io = { version = "0.2.0", features = ["terminal-io"] }
+io-streams = { version = "0.1.0", features = ["layered-io", "terminal-io", "use-char-device"] }
+io-arrays = "0.2.0"
 memchr = "2.3.4"
 mime = "0.3.16"
 mime_guess = "2.0.3"
 percent-encoding = "2.1.0"
-text-formats = { path = "../text-formats", features = ["terminal-support"] }
-unsafe-io = { path = "../unsafe-io" }
-readwrite = { version = "0.1.2", optional = true }
-ureq = { version = "1.5.4", default-features = false, features = ["tls", "charset"] }
+basic-text = { version = "0.0.0", features = ["terminal-io"] }
+unsafe-io = "0.3.0"
+ureq = { version = "2.0.0", default-features = false, features = ["tls", "charset"] }
 url = "2.2.0"
-terminal-support = { path = "../terminal-support" }
+terminal-io = "0.1.0"
+ssh2 = { version = "0.9.0", optional = true }
+utf8-io = { version = "0.1.0", features = ["layered-io", "terminal-io"] }
+duplex = "0.1.0"
 
 [target.'cfg(not(windows))'.dependencies]
 libc = "0.2.80"
-posish = { path = "../posish" }
+posish = "0.5.5"
 shell-words = "1.0.0"
 
 [target.'cfg(windows)'.dependencies]
@@ -44,9 +47,13 @@ humantime = "2.0.1"
 kommand = { path = "kommand" }
 reaktor = { path = "reaktor" }
 regex = "1.4.2"
-clap = { path = "../clap" }
-clap_derive = { path = "../clap/clap_derive" }
-itertools = "0.9.0"
+itertools = "0.10.0"
+# We need to add a few patches in clap. We've submitted the patches upstream:
+#  - https://github.com/clap-rs/clap/pull/2206
+#  - https://github.com/clap-rs/clap/pull/2298
+# So we use our own git dependencies for now.
+clap = { git = "https://github.com/sunfishcode/clap", branch = "auto" }
+clap_derive = { git = "https://github.com/sunfishcode/clap", branch = "auto" }
 
 [badges]
 maintenance = { status = "actively-developed" }

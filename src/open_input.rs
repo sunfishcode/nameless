@@ -2,13 +2,13 @@ use crate::{path_to_name::path_to_name, Mime, Type};
 use anyhow::anyhow;
 use data_url::DataUrl;
 use flate2::read::GzDecoder;
-use io_handles::ReadHandle;
+use io_streams::StreamReader;
 use std::{fs::File, path::Path, str::FromStr};
 use url::Url;
 
 pub(crate) struct Input {
     pub(crate) name: String,
-    pub(crate) reader: ReadHandle,
+    pub(crate) reader: StreamReader,
     pub(crate) type_: Type,
     pub(crate) initial_size: Option<u64>,
 }
@@ -35,7 +35,7 @@ pub(crate) fn open_input(s: &str) -> anyhow::Result<Input> {
 }
 
 fn acquire_stdin() -> anyhow::Result<Input> {
-    let reader = ReadHandle::stdin()?;
+    let reader = StreamReader::stdin()?;
     Ok(Input {
         name: "-".to_owned(),
         reader,
@@ -71,15 +71,9 @@ fn open_url(url: Url) -> anyhow::Result<Input> {
 
 fn open_http_url_str(http_url_str: &str) -> anyhow::Result<Input> {
     // TODO: Set any headers, like "Accept"?
-    let response = ureq::get(http_url_str).call();
-
-    if !response.ok() {
-        return Err(anyhow!(
-            "HTTP error fetching {}: {}",
-            http_url_str,
-            response.status_line()
-        ));
-    }
+    let response = ureq::get(http_url_str)
+        .call()
+        .map_err(|e| anyhow!("HTTP error fetching {}: {}", http_url_str, e))?;
 
     let initial_size = Some(
         response
@@ -91,7 +85,7 @@ fn open_http_url_str(http_url_str: &str) -> anyhow::Result<Input> {
     let type_ = Type::from_mime(Mime::from_str(content_type)?);
 
     let reader = response.into_reader();
-    let reader = ReadHandle::piped_thread(Box::new(reader))?;
+    let reader = StreamReader::piped_thread(Box::new(reader))?;
     Ok(Input {
         name: http_url_str.to_owned(),
         type_,
@@ -117,7 +111,7 @@ fn open_data_url_str(data_url_str: &str) -> anyhow::Result<Input> {
     // TODO: Consider submitting patches to `data_url` to streamline this.
     let type_ = Type::from_mime(Mime::from_str(&data_url.mime_type().to_string()).unwrap());
 
-    let reader = ReadHandle::bytes(&body)?;
+    let reader = StreamReader::bytes(&body)?;
     Ok(Input {
         name: data_url_str.to_owned(),
         reader,
@@ -136,7 +130,7 @@ fn open_path(path: &Path) -> anyhow::Result<Input> {
         let type_ = Type::from_extension(path.extension());
         let initial_size = None;
         let reader = GzDecoder::new(file);
-        let reader = ReadHandle::piped_thread(Box::new(reader))?;
+        let reader = StreamReader::piped_thread(Box::new(reader))?;
         Ok(Input {
             name,
             reader,
@@ -146,7 +140,7 @@ fn open_path(path: &Path) -> anyhow::Result<Input> {
     } else {
         let type_ = Type::from_extension(path.extension());
         let initial_size = Some(file.metadata()?.len());
-        let reader = ReadHandle::file(file);
+        let reader = StreamReader::file(file);
         Ok(Input {
             name,
             reader,
@@ -172,7 +166,7 @@ fn spawn_child(s: &str) -> anyhow::Result<Input> {
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .spawn()?;
-    let reader = ReadHandle::child_stdout(child.stdout.unwrap());
+    let reader = StreamReader::child_stdout(child.stdout.unwrap());
     Ok(Input {
         name: s.to_owned(),
         reader,

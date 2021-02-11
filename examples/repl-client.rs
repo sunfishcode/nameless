@@ -1,7 +1,7 @@
 //! An example client program for the `repl` example. See the `repl` example
 //! for details.
 
-use io_handles::BufReaderLineWriter;
+use io_streams::BufReaderLineWriter;
 use nameless::InteractiveTextStream;
 use std::{
     io::{BufRead, Read, Write},
@@ -13,7 +13,7 @@ const PROMPT: &str = "prompt> \u{34f}";
 #[kommand::main]
 fn main(io: InteractiveTextStream) -> anyhow::Result<()> {
     let mut io = BufReaderLineWriter::new(io);
-    let mut v = [0u8; PROMPT.len()];
+    let mut v = [0_u8; PROMPT.len()];
     let mut s = String::new();
 
     // Read the "prompt> ".

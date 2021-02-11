@@ -8,7 +8,7 @@ use unsafe_io::AsUnsafeHandle;
 /// bat to do syntax highlighting and paging.
 pub(crate) fn summon_bat(stdout: &impl AsUnsafeHandle, type_: &Type) -> Option<Child> {
     #[cfg(not(windows))]
-    assert_eq!(stdout.as_unsafe_handle().as_raw_fd(), libc::STDOUT_FILENO);
+    assert_eq!(stdout.as_unsafe_handle().as_raw_fd(), libc::STDOUT_FILENO); // fixme: don't hardcode STDOUT_FILENO?
 
     // If the "bat" command is available, use it.
     Command::new("bat")

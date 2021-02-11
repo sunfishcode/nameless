@@ -2,16 +2,16 @@ use crate::{
     open_input::{open_input, Input},
     Pseudonym, Type,
 };
-use io_ext::{Bufferable, ReadExt, Status};
-use io_ext_adapters::ExtReader;
-use io_handles::ReadHandle;
+use basic_text::{ReadText, ReadTextLayered, TextReader, TextStr};
+use io_streams::StreamReader;
+use layered_io::{Bufferable, LayeredReader, ReadLayered, Status};
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, IoSliceMut, Read},
     str::FromStr,
 };
-use terminal_support::TerminalReader;
-use text_formats::{ReadStr, TextReader};
+use terminal_io::TerminalReader;
+use utf8_io::{ReadStr, ReadStrLayered, Utf8Reader};
 
 /// In input stream for plain text input.
 ///
@@ -41,7 +41,7 @@ use text_formats::{ReadStr, TextReader};
 ///    local path, arrange for it to begin with `./` or `/`.
 pub struct InputTextStream {
     name: String,
-    reader: TextReader<ExtReader<TerminalReader<ReadHandle>>>,
+    reader: TextReader<Utf8Reader<LayeredReader<TerminalReader<StreamReader>>>>,
     type_: Type,
     initial_size: Option<u64>,
 }
@@ -74,7 +74,8 @@ impl InputTextStream {
 
     fn from_input(input: Input) -> Self {
         let reader = TerminalReader::with_handle(input.reader);
-        let reader = ExtReader::new(reader);
+        let reader = LayeredReader::new(reader);
+        let reader = Utf8Reader::new(reader);
         let reader = TextReader::new(reader);
         Self {
             name: input.name,
@@ -100,7 +101,7 @@ impl FromStr for InputTextStream {
     }
 }
 
-impl ReadExt for InputTextStream {
+impl ReadLayered for InputTextStream {
     #[inline]
     fn read_with_status(&mut self, buf: &mut [u8]) -> io::Result<(usize, Status)> {
         self.reader.read_with_status(buf)
@@ -157,8 +158,35 @@ impl Bufferable for InputTextStream {
 
 impl ReadStr for InputTextStream {
     #[inline]
-    fn read_str(&mut self, buf: &mut str) -> io::Result<(usize, Status)> {
+    fn read_str(&mut self, buf: &mut str) -> io::Result<usize> {
         self.reader.read_str(buf)
+    }
+}
+
+impl ReadStrLayered for InputTextStream {
+    #[inline]
+    fn read_str_with_status(&mut self, buf: &mut str) -> io::Result<(usize, Status)> {
+        self.reader.read_str_with_status(buf)
+    }
+}
+
+impl ReadText for InputTextStream {
+    fn read_text(&mut self, buf: &mut TextStr) -> io::Result<usize> {
+        self.reader.read_text(buf)
+    }
+
+    fn read_exact_text(&mut self, buf: &mut TextStr) -> io::Result<()> {
+        self.reader.read_exact_text(buf)
+    }
+}
+
+impl ReadTextLayered for InputTextStream {
+    fn read_text_with_status(&mut self, buf: &mut TextStr) -> io::Result<(usize, Status)> {
+        self.reader.read_text_with_status(buf)
+    }
+
+    fn read_exact_text_using_status(&mut self, buf: &mut TextStr) -> io::Result<Status> {
+        self.reader.read_exact_text_using_status(buf)
     }
 }
 

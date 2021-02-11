@@ -5,9 +5,9 @@ use crate::{
     open_output::{open_output, Output},
     Pseudonym, Type,
 };
-use io_ext::{Bufferable, WriteExt};
-use io_ext_adapters::ExtWriter;
-use io_handles::WriteHandle;
+use basic_text::{TextStr, TextWriter, WriteText};
+use io_streams::StreamWriter;
+use layered_io::{Bufferable, LayeredWriter, WriteLayered};
 #[cfg(all(not(unix), not(windows)))]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 #[cfg(windows)]
@@ -18,8 +18,8 @@ use std::{
     process::{exit, Child},
     str::FromStr,
 };
-use terminal_support::{Terminal, TerminalColorSupport, TerminalWriter, WriteTerminal};
-use text_formats::TextWriter;
+use terminal_io::{Terminal, TerminalColorSupport, TerminalWriter, WriteTerminal};
+use utf8_io::{Utf8Writer, WriteStr};
 
 /// An output stream for plain text output.
 ///
@@ -49,9 +49,9 @@ use text_formats::TextWriter;
 /// output implicitly.
 pub struct OutputTextStream {
     name: String,
-    writer: TextWriter<ExtWriter<TerminalWriter<WriteHandle>>>,
+    writer: TextWriter<Utf8Writer<LayeredWriter<TerminalWriter<StreamWriter>>>>,
     type_: Type,
-    helper_child: Option<(Child, WriteHandle)>,
+    helper_child: Option<(Child, StreamWriter)>,
 }
 
 impl OutputTextStream {
@@ -88,10 +88,11 @@ impl OutputTextStream {
             let stdout_helper_child = summon_bat(&terminal, &output.type_);
 
             if let Some(mut stdout_helper_child) = stdout_helper_child {
-                let writer = WriteHandle::child_stdin(stdout_helper_child.stdin.take().unwrap());
+                let writer = StreamWriter::child_stdin(stdout_helper_child.stdin.take().unwrap());
                 let writer =
                     TerminalWriter::from(writer, is_terminal, color_support, color_preference);
-                let writer = ExtWriter::new(writer);
+                let writer = LayeredWriter::new(writer);
+                let writer = Utf8Writer::new(writer);
                 let writer = TextWriter::with_ansi_color_output(writer);
 
                 return Self {
@@ -103,7 +104,8 @@ impl OutputTextStream {
             }
         }
 
-        let writer = ExtWriter::new(terminal);
+        let writer = LayeredWriter::new(terminal);
+        let writer = Utf8Writer::new(writer);
         let writer = TextWriter::with_ansi_color_output(writer);
         Self {
             name: output.name,
@@ -129,10 +131,10 @@ impl FromStr for OutputTextStream {
     }
 }
 
-impl WriteExt for OutputTextStream {
+impl WriteLayered for OutputTextStream {
     #[inline]
-    fn end(&mut self) -> io::Result<()> {
-        self.writer.end()?;
+    fn close(&mut self) -> io::Result<()> {
+        self.writer.close()?;
 
         if let Some(mut helper_child) = self.helper_child.take() {
             helper_child.0.wait()?;
@@ -140,7 +142,9 @@ impl WriteExt for OutputTextStream {
 
         Ok(())
     }
+}
 
+impl WriteStr for OutputTextStream {
     #[inline]
     fn write_str(&mut self, buf: &str) -> io::Result<()> {
         self.writer.write_str(buf)
@@ -212,6 +216,12 @@ impl WriteTerminal for OutputTextStream {
     }
 }
 
+impl WriteText for OutputTextStream {
+    fn write_text(&mut self, buf: &TextStr) -> io::Result<()> {
+        self.writer.write_text(buf)
+    }
+}
+
 impl Drop for OutputTextStream {
     fn drop(&mut self) {
         if let Some(mut helper_child) = self.helper_child.take() {
@@ -221,7 +231,7 @@ impl Drop for OutputTextStream {
             // these errors.
 
             // Close standard output, prompting the child process to exit.
-            if let Err(e) = self.writer.end() {
+            if let Err(e) = self.writer.close() {
                 eprintln!("Output formatting process encountered error: {:?}", e);
                 exit(libc::EXIT_FAILURE);
             }

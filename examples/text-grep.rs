@@ -1,9 +1,12 @@
 //! A simple grep-like program using `kommand` and `InputTextStream`.
 //! Unlike regular grep, this grep supports URLs and gzip. Perg!
 
-use nameless::{InputTextStream, OutputTextStream, Type};
+use nameless::{InputTextStream, OutputTextStream};
 use regex::Regex;
-use std::io::{self, BufRead, BufReader, Write};
+use std::{
+    io::{self, BufRead, BufReader, Write},
+    str::FromStr,
+};
 
 #[rustfmt::skip] // TODO: rustfmt mishandles doc comments on arguments
 #[kommand::main]
@@ -14,10 +17,10 @@ fn main(
     /// Input sources, stdin if none.
     mut inputs: Vec<InputTextStream>,
 ) -> anyhow::Result<()> {
-    let mut output = OutputTextStream::stdout(Type::text())?;
+    let mut output = OutputTextStream::from_str("-")?;
 
     if inputs.is_empty() {
-        inputs.push(InputTextStream::stdin()?);
+        inputs.push(InputTextStream::from_str("-")?);
     }
 
     let print_inputs = inputs.len() > 1;

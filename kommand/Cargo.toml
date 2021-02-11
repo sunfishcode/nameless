@@ -19,8 +19,8 @@ proc-macro2 = { version = "1.0.2", features = ["nightly"] }
 quote = "1.0.2"
 
 [dev-dependencies]
-clap = { path = "../../clap" }
-clap_derive = { path = "../../clap/clap_derive" }
+clap = { git = "https://github.com/sunfishcode/clap", branch = "auto" }
+clap_derive = { git = "https://github.com/sunfishcode/clap", branch = "auto" }
 
 [badges]
 maintenance = { status = "actively-developed" }

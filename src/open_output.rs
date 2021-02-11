@@ -1,13 +1,13 @@
 use crate::{path_to_name::path_to_name, Type};
 use anyhow::anyhow;
 use flate2::{write::GzEncoder, Compression};
-use io_handles::WriteHandle;
+use io_streams::StreamWriter;
 use std::{fs::File, path::Path};
 use url::Url;
 
 pub(crate) struct Output {
     pub(crate) name: String,
-    pub(crate) writer: WriteHandle,
+    pub(crate) writer: StreamWriter,
     pub(crate) type_: Type,
 }
 
@@ -33,7 +33,7 @@ pub(crate) fn open_output(s: &str, type_: Type) -> anyhow::Result<Output> {
 }
 
 fn acquire_stdout(type_: Type) -> anyhow::Result<Output> {
-    let stdout = WriteHandle::stdout()?;
+    let stdout = StreamWriter::stdout()?;
 
     Ok(Output {
         name: "-".to_string(),
@@ -80,7 +80,7 @@ fn open_path(path: &Path, type_: Type) -> anyhow::Result<Output> {
         let type_ = Type::merge(type_, Type::from_extension(path.extension()));
         // 6 is the default gzip compression level.
         let writer =
-            WriteHandle::piped_thread(Box::new(GzEncoder::new(file, Compression::new(6))))?;
+            StreamWriter::piped_thread(Box::new(GzEncoder::new(file, Compression::new(6))))?;
         Ok(Output {
             name,
             writer,
@@ -88,7 +88,7 @@ fn open_path(path: &Path, type_: Type) -> anyhow::Result<Output> {
         })
     } else {
         let type_ = Type::merge(type_, Type::from_extension(path.extension()));
-        let writer = WriteHandle::file(file);
+        let writer = StreamWriter::file(file);
         Ok(Output {
             name,
             writer,
@@ -113,7 +113,7 @@ fn spawn_child(s: &str, type_: Type) -> anyhow::Result<Output> {
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .spawn()?;
-    let writer = WriteHandle::child_stdin(child.stdin.unwrap());
+    let writer = StreamWriter::child_stdin(child.stdin.unwrap());
     Ok(Output {
         name: s.to_owned(),
         writer,

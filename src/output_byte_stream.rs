@@ -4,15 +4,14 @@ use crate::{
     Pseudonym, Type,
 };
 use anyhow::anyhow;
-use io_ext::{Bufferable, WriteExt};
-use io_ext_adapters::ExtWriter;
-use io_handles::WriteHandle;
+use io_streams::StreamWriter;
+use layered_io::{Bufferable, LayeredWriter, WriteLayered};
 use std::{
     fmt::{self, Arguments, Debug, Formatter},
     io::{self, IoSlice, Write},
     str::FromStr,
 };
-use terminal_support::{NeverTerminalWriter, TerminalWriter, WriteTerminal};
+use terminal_io::{NeverTerminalWriter, TerminalWriter, WriteTerminal};
 
 /// An output stream for binary output.
 ///
@@ -42,7 +41,7 @@ use terminal_support::{NeverTerminalWriter, TerminalWriter, WriteTerminal};
 /// output implicitly.
 pub struct OutputByteStream {
     name: String,
-    writer: ExtWriter<NeverTerminalWriter<WriteHandle>>,
+    writer: LayeredWriter<NeverTerminalWriter<StreamWriter>>,
     type_: Type,
 }
 
@@ -77,7 +76,7 @@ impl OutputByteStream {
             return Err(anyhow!("attempted to write binary output to a terminal"));
         }
 
-        let writer = ExtWriter::new(writer.into_inner());
+        let writer = LayeredWriter::new(writer.into_inner());
 
         Ok(Self {
             name: output.name,
@@ -101,15 +100,10 @@ impl FromStr for OutputByteStream {
     }
 }
 
-impl WriteExt for OutputByteStream {
+impl WriteLayered for OutputByteStream {
     #[inline]
-    fn end(&mut self) -> io::Result<()> {
-        self.writer.end()
-    }
-
-    #[inline]
-    fn write_str(&mut self, buf: &str) -> io::Result<()> {
-        self.writer.write_str(buf)
+    fn close(&mut self) -> io::Result<()> {
+        self.writer.close()
     }
 }
 

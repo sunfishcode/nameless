@@ -2,15 +2,14 @@ use crate::{
     open_input::{open_input, Input},
     Pseudonym, Type,
 };
-use io_ext::{Bufferable, ReadExt, Status};
-use io_ext_adapters::ExtReader;
-use io_handles::ReadHandle;
+use io_streams::StreamReader;
+use layered_io::{Bufferable, LayeredReader, ReadLayered, Status};
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, IoSliceMut, Read},
     str::FromStr,
 };
-use terminal_support::NeverTerminalReader;
+use terminal_io::NeverTerminalReader;
 
 /// An input stream for binary input.
 ///
@@ -40,7 +39,7 @@ use terminal_support::NeverTerminalReader;
 ///    local path, arrange for it to begin with `./` or `/`.
 pub struct InputByteStream {
     name: String,
-    reader: ExtReader<NeverTerminalReader<ReadHandle>>,
+    reader: LayeredReader<NeverTerminalReader<StreamReader>>,
     type_: Type,
     initial_size: Option<u64>,
 }
@@ -75,7 +74,7 @@ impl InputByteStream {
 
     fn from_input(input: Input) -> Self {
         let reader = NeverTerminalReader::new(input.reader);
-        let reader = ExtReader::new(reader);
+        let reader = LayeredReader::new(reader);
         Self {
             name: input.name,
             reader,
@@ -99,7 +98,7 @@ impl FromStr for InputByteStream {
     }
 }
 
-impl ReadExt for InputByteStream {
+impl ReadLayered for InputByteStream {
     #[inline]
     fn read_with_status(&mut self, buf: &mut [u8]) -> io::Result<(usize, Status)> {
         self.reader.read_with_status(buf)

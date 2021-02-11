@@ -43,11 +43,11 @@
 //! [entered "world"]
 //! ```
 
-use io_ext::Bufferable;
-use io_handles::BufReaderLineWriter;
+use io_streams::BufReaderLineWriter;
+use layered_io::Bufferable;
 use nameless::InteractiveTextStream;
 use std::io::{self, BufRead, Write};
-use terminal_support::{TerminalColorSupport, WriteTerminal};
+use terminal_io::{TerminalColorSupport, WriteTerminal};
 
 #[kommand::main]
 fn main(io: InteractiveTextStream) -> anyhow::Result<()> {
