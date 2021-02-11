@@ -19,6 +19,7 @@ use std::{
     str::FromStr,
 };
 use terminal_io::{Terminal, TerminalColorSupport, TerminalWriter, WriteTerminal};
+use unsafe_io::AsUnsafeHandle;
 use utf8_io::{Utf8Writer, WriteStr};
 
 /// An output stream for plain text output.
@@ -78,13 +79,19 @@ impl OutputTextStream {
     }
 
     fn from_output(output: Output) -> Self {
+        let is_stdout = unsafe {
+            output
+                .writer
+                .as_unsafe_handle()
+                .eq(std::io::stdout().as_unsafe_handle())
+        };
         let terminal = TerminalWriter::with_handle(output.writer);
         let is_terminal = terminal.is_output_terminal();
         let color_support = terminal.color_support();
         let color_preference = terminal.color_preference();
 
         #[cfg(unix)]
-        if is_terminal {
+        if is_terminal && is_stdout {
             let stdout_helper_child = summon_bat(&terminal, &output.type_);
 
             if let Some(mut stdout_helper_child) = stdout_helper_child {
