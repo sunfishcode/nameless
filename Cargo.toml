@@ -16,10 +16,12 @@ rustc_version = "0.3.0"
 [dependencies]
 anyhow = "1.0.35"
 char-device = "0.1.0"
+clap = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
 data-url = "0.1.0"
+duplex = { version = "0.1.1", features = ["ssh2"] }
 flate2 = "1.0.19"
 layered-io = { version = "0.2.0", features = ["terminal-io"] }
-io-streams = { version = "0.1.0", features = ["layered-io", "terminal-io", "use-char-device"] }
+io-streams = { version = "0.2.1", features = ["layered-io", "terminal-io", "use-char-device", "use-socketpair"] }
 io-arrays = "0.2.0"
 memchr = "2.3.4"
 mime = "0.3.16"
@@ -31,8 +33,9 @@ ureq = { version = "2.0.0", default-features = false, features = ["tls", "charse
 url = "2.2.0"
 terminal-io = "0.1.0"
 ssh2 = { version = "0.9.0", optional = true }
+system-interface = { version = "0.6.1", features = ["ssh2"] }
 utf8-io = { version = "0.1.0", features = ["layered-io", "terminal-io"] }
-duplex = "0.1.0"
+whoami = "1.1.0"
 
 [target.'cfg(not(windows))'.dependencies]
 libc = "0.2.80"
@@ -52,8 +55,8 @@ itertools = "0.10.0"
 #  - https://github.com/clap-rs/clap/pull/2206
 #  - https://github.com/clap-rs/clap/pull/2298
 # So we use our own git dependencies for now.
-clap = { git = "https://github.com/sunfishcode/clap", branch = "auto" }
-clap_derive = { git = "https://github.com/sunfishcode/clap", branch = "auto" }
+clap = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
+clap_derive = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
 
 [badges]
 maintenance = { status = "actively-developed" }

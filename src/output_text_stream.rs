@@ -6,6 +6,7 @@ use crate::{
     Pseudonym, Type,
 };
 use basic_text::{TextStr, TextWriter, WriteText};
+use clap::TryFromOsArg;
 use io_streams::StreamWriter;
 use layered_io::{Bufferable, LayeredWriter, WriteLayered};
 #[cfg(all(not(unix), not(windows)))]
@@ -13,10 +14,10 @@ use std::os::unix::io::{AsRawFd, FromRawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawHandle, FromRawHandle};
 use std::{
+    ffi::{OsStr, OsString},
     fmt::{self, Arguments, Debug, Formatter},
     io::{self, IoSlice, Write},
     process::{exit, Child},
-    str::FromStr,
 };
 use terminal_io::{Terminal, TerminalColorSupport, TerminalWriter, WriteTerminal};
 use unsafe_io::AsUnsafeHandle;
@@ -130,11 +131,12 @@ impl OutputTextStream {
 ///  - This uses `str` so it only handles well-formed Unicode paths.
 ///  - Opening resources from strings depends on ambient authorities.
 #[doc(hidden)]
-impl FromStr for OutputTextStream {
-    type Err = anyhow::Error;
+impl TryFromOsArg for OutputTextStream {
+    type Error = anyhow::Error;
 
-    fn from_str(s: &str) -> anyhow::Result<Self> {
-        open_output(s, Type::text()).map(Self::from_output)
+    #[inline]
+    fn try_from_os_str_arg(os: &OsStr) -> anyhow::Result<Self> {
+        open_output(os, Type::text()).map(Self::from_output)
     }
 }
 
@@ -266,7 +268,7 @@ impl Drop for OutputTextStream {
 impl FromLazyOutput for OutputTextStream {
     type Err = anyhow::Error;
 
-    fn from_lazy_output(name: String, type_: Type) -> Result<Self, anyhow::Error> {
+    fn from_lazy_output(name: OsString, type_: Type) -> Result<Self, anyhow::Error> {
         open_output(&name, type_).map(Self::from_output)
     }
 }

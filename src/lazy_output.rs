@@ -1,5 +1,11 @@
 use crate::Type;
-use std::{error::Error, fmt, marker::PhantomData, str::FromStr};
+use clap::TryFromOsArg;
+use std::{
+    error::Error,
+    ffi::{OsStr, OsString},
+    fmt,
+    marker::PhantomData,
+};
 
 #[doc(hidden)]
 #[derive(Debug)]
@@ -17,7 +23,7 @@ impl fmt::Display for Never {
 pub trait FromLazyOutput {
     type Err;
 
-    fn from_lazy_output(name: String, type_: Type) -> Result<Self, Self::Err>
+    fn from_lazy_output(name: OsString, type_: Type) -> Result<Self, Self::Err>
     where
         Self: Sized;
 }
@@ -25,7 +31,7 @@ pub trait FromLazyOutput {
 /// A placeholder for an output stream which is created lazily. It is created
 /// when `materialize` is called.
 pub struct LazyOutput<T: FromLazyOutput> {
-    name: String,
+    name: OsString,
     _phantom: PhantomData<T>,
 }
 
@@ -37,13 +43,13 @@ impl<T: FromLazyOutput> LazyOutput<T> {
     }
 }
 
-impl<T: FromLazyOutput> FromStr for LazyOutput<T> {
-    type Err = Never;
+impl<T: FromLazyOutput> TryFromOsArg for LazyOutput<T> {
+    type Error = Never;
 
     #[inline]
-    fn from_str(s: &str) -> Result<Self, Never> {
+    fn try_from_os_str_arg(os: &OsStr) -> Result<Self, Never> {
         Ok(Self {
-            name: s.to_owned(),
+            name: os.to_owned(),
             _phantom: PhantomData::default(),
         })
     }

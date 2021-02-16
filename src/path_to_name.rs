@@ -37,7 +37,7 @@ pub(crate) fn path_to_name(scheme: &str, path: &Path) -> anyhow::Result<String> 
             .escape_default()
             .to_string();
         if result.contains(':') {
-            return Err(anyhow!("not supported yet: strings containins `:`"));
+            return Err(anyhow!("not supported yet: strings contains `:`"));
         }
         let display = path.display().to_string();
         if result == display {

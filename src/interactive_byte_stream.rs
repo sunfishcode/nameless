@@ -2,6 +2,7 @@ use crate::{
     open_interactive::{open_interactive, Interactive},
     Pseudonym,
 };
+use clap::TryFromOsArg;
 use duplex::Duplex;
 use io_streams::StreamDuplexer;
 use layered_io::{
@@ -9,9 +10,9 @@ use layered_io::{
     LayeredDuplexer, ReadLayered, Status, WriteLayered,
 };
 use std::{
+    ffi::OsStr,
     fmt::{self, Arguments, Debug, Formatter},
     io::{self, IoSlice, IoSliceMut, Read, Write},
-    str::FromStr,
 };
 use terminal_io::{
     DuplexTerminal, NeverTerminalDuplexer, ReadTerminal, Terminal, TerminalColorSupport,
@@ -61,11 +62,12 @@ impl InteractiveByteStream {
 ///  - This uses `str` so it only handles well-formed Unicode paths.
 ///  - Opening resources from strings depends on ambient authorities.
 #[doc(hidden)]
-impl FromStr for InteractiveByteStream {
-    type Err = anyhow::Error;
+impl TryFromOsArg for InteractiveByteStream {
+    type Error = anyhow::Error;
 
-    fn from_str(s: &str) -> anyhow::Result<Self> {
-        open_interactive(s).map(Self::from_interactive)
+    #[inline]
+    fn try_from_os_str_arg(os: &OsStr) -> anyhow::Result<Self> {
+        open_interactive(os).map(Self::from_interactive)
     }
 }
 

@@ -1,8 +1,9 @@
 //! A simple program using `kommand` that copies from an
 //! `InputByteStream` into an `OutputByteStream`.
 
+use clap::TryFromOsArg;
 use nameless::{InputByteStream, OutputByteStream};
-use std::{io::copy, str::FromStr};
+use std::io::copy;
 
 #[rustfmt::skip] // TODO: rustfmt mishandles doc comments on arguments
 #[kommand::main]
@@ -16,12 +17,12 @@ fn main(
     let mut input = if let Some(input) = input {
         input
     } else {
-        InputByteStream::from_str("-")?
+        InputByteStream::try_from_os_str_arg("-".as_ref())?
     };
     let mut output = if let Some(output) = output {
         output
     } else {
-        OutputByteStream::from_str("-")?
+        OutputByteStream::try_from_os_str_arg("-".as_ref())?
     };
 
     copy(&mut input, &mut output)?;

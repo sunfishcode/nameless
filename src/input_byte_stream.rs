@@ -2,12 +2,13 @@ use crate::{
     open_input::{open_input, Input},
     Pseudonym, Type,
 };
+use clap::TryFromOsArg;
 use io_streams::StreamReader;
 use layered_io::{Bufferable, LayeredReader, ReadLayered, Status};
 use std::{
+    ffi::OsStr,
     fmt::{self, Debug, Formatter},
     io::{self, IoSliceMut, Read},
-    str::FromStr,
 };
 use terminal_io::NeverTerminalReader;
 
@@ -90,11 +91,12 @@ impl InputByteStream {
 ///  - This uses `str` so it only handles well-formed Unicode paths.
 ///  - Opening resources from strings depends on ambient authorities.
 #[doc(hidden)]
-impl FromStr for InputByteStream {
-    type Err = anyhow::Error;
+impl TryFromOsArg for InputByteStream {
+    type Error = anyhow::Error;
 
-    fn from_str(s: &str) -> anyhow::Result<Self> {
-        open_input(s).map(Self::from_input)
+    #[inline]
+    fn try_from_os_str_arg(os: &OsStr) -> anyhow::Result<Self> {
+        open_input(os).map(Self::from_input)
     }
 }
 
@@ -166,7 +168,7 @@ impl Debug for InputByteStream {
 #[test]
 fn data_url_plain() {
     let mut s = String::new();
-    InputByteStream::from_str("data:,Hello%2C%20World!")
+    InputByteStream::try_from_os_str_arg("data:,Hello%2C%20World!".as_ref())
         .unwrap()
         .read_to_string(&mut s)
         .unwrap();
@@ -176,7 +178,7 @@ fn data_url_plain() {
 #[test]
 fn data_url_base64() {
     let mut s = String::new();
-    InputByteStream::from_str("data:text/plain;base64,SGVsbG8sIFdvcmxkIQ==")
+    InputByteStream::try_from_os_str_arg("data:text/plain;base64,SGVsbG8sIFdvcmxkIQ==".as_ref())
         .unwrap()
         .read_to_string(&mut s)
         .unwrap();

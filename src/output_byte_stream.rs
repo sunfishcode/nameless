@@ -4,12 +4,13 @@ use crate::{
     Pseudonym, Type,
 };
 use anyhow::anyhow;
+use clap::TryFromOsArg;
 use io_streams::StreamWriter;
 use layered_io::{Bufferable, LayeredWriter, WriteLayered};
 use std::{
+    ffi::{OsStr, OsString},
     fmt::{self, Arguments, Debug, Formatter},
     io::{self, IoSlice, Write},
-    str::FromStr,
 };
 use terminal_io::{NeverTerminalWriter, TerminalWriter, WriteTerminal};
 
@@ -92,11 +93,12 @@ impl OutputByteStream {
 ///  - This uses `str` so it only handles well-formed Unicode paths.
 ///  - Opening resources from strings depends on ambient authorities.
 #[doc(hidden)]
-impl FromStr for OutputByteStream {
-    type Err = anyhow::Error;
+impl TryFromOsArg for OutputByteStream {
+    type Error = anyhow::Error;
 
-    fn from_str(s: &str) -> anyhow::Result<Self> {
-        open_output(s, Type::unknown()).and_then(Self::from_output)
+    #[inline]
+    fn try_from_os_str_arg(os: &OsStr) -> anyhow::Result<Self> {
+        open_output(os, Type::unknown()).and_then(Self::from_output)
     }
 }
 
@@ -156,7 +158,7 @@ impl Bufferable for OutputByteStream {
 impl FromLazyOutput for OutputByteStream {
     type Err = anyhow::Error;
 
-    fn from_lazy_output(name: String, type_: Type) -> Result<Self, anyhow::Error> {
+    fn from_lazy_output(name: OsString, type_: Type) -> Result<Self, anyhow::Error> {
         open_output(&name, type_).and_then(Self::from_output)
     }
 }

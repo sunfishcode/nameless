@@ -3,15 +3,16 @@ use crate::{
     Pseudonym,
 };
 use basic_text::TextDuplexer;
+use clap::TryFromOsArg;
 use duplex::Duplex;
 use io_streams::StreamDuplexer;
 use layered_io::{Bufferable, LayeredDuplexer, ReadLayered, Status, WriteLayered};
 #[cfg(windows)]
 use std::os::windows::io::FromRawHandle;
 use std::{
+    ffi::OsStr,
     fmt::{self, Arguments, Debug, Formatter},
     io::{self, IoSlice, IoSliceMut, Read, Write},
-    str::FromStr,
 };
 use terminal_io::{
     DuplexTerminal, ReadTerminal, Terminal, TerminalColorSupport, TerminalDuplexer, WriteTerminal,
@@ -70,11 +71,12 @@ impl InteractiveTextStream {
 ///  - This uses `str` so it only handles well-formed Unicode paths.
 ///  - Opening resources from strings depends on ambient authorities.
 #[doc(hidden)]
-impl FromStr for InteractiveTextStream {
-    type Err = anyhow::Error;
+impl TryFromOsArg for InteractiveTextStream {
+    type Error = anyhow::Error;
 
-    fn from_str(s: &str) -> anyhow::Result<Self> {
-        open_interactive(s).map(Self::from_interactive)
+    #[inline]
+    fn try_from_os_str_arg(os: &OsStr) -> anyhow::Result<Self> {
+        open_interactive(os).map(Self::from_interactive)
     }
 }
 

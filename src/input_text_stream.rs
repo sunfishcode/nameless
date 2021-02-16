@@ -3,12 +3,13 @@ use crate::{
     Pseudonym, Type,
 };
 use basic_text::{ReadText, ReadTextLayered, TextReader, TextStr};
+use clap::TryFromOsArg;
 use io_streams::StreamReader;
 use layered_io::{Bufferable, LayeredReader, ReadLayered, Status};
 use std::{
+    ffi::OsStr,
     fmt::{self, Debug, Formatter},
     io::{self, IoSliceMut, Read},
-    str::FromStr,
 };
 use terminal_io::TerminalReader;
 use utf8_io::{ReadStr, ReadStrLayered, Utf8Reader};
@@ -93,12 +94,12 @@ impl InputTextStream {
 ///  - This uses `str` so it only handles well-formed Unicode paths.
 ///  - Opening resources from strings depends on ambient authorities.
 #[doc(hidden)]
-impl FromStr for InputTextStream {
-    type Err = anyhow::Error;
+impl TryFromOsArg for InputTextStream {
+    type Error = anyhow::Error;
 
     #[inline]
-    fn from_str(s: &str) -> anyhow::Result<Self> {
-        open_input(s).map(Self::from_input)
+    fn try_from_os_str_arg(os: &OsStr) -> anyhow::Result<Self> {
+        open_input(os).map(Self::from_input)
     }
 }
 
@@ -204,7 +205,7 @@ impl Debug for InputTextStream {
 #[test]
 fn data_url_plain() {
     let mut s = String::new();
-    InputTextStream::from_str("data:,Hello%2C%20World!")
+    InputTextStream::try_from_os_str_arg("data:,Hello%2C%20World!".as_ref())
         .unwrap()
         .read_to_string(&mut s)
         .unwrap();
@@ -214,7 +215,7 @@ fn data_url_plain() {
 #[test]
 fn data_url_base64() {
     let mut s = String::new();
-    InputTextStream::from_str("data:text/plain;base64,SGVsbG8sIFdvcmxkIQ==")
+    InputTextStream::try_from_os_str_arg("data:text/plain;base64,SGVsbG8sIFdvcmxkIQ==".as_ref())
         .unwrap()
         .read_to_string(&mut s)
         .unwrap();

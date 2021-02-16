@@ -1,9 +1,11 @@
 use crate::path_to_name::path_to_name;
 use anyhow::anyhow;
+use char_device::CharDevice;
 use io_streams::StreamDuplexer;
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::{
+    ffi::OsStr,
     net::{TcpListener, TcpStream},
     path::Path,
 };
@@ -14,25 +16,31 @@ pub(crate) struct Interactive {
     pub(crate) duplexer: StreamDuplexer,
 }
 
-pub(crate) fn open_interactive(s: &str) -> anyhow::Result<Interactive> {
-    // If we can parse it as a URL, treat it as such.
-    if let Ok(url) = Url::parse(s) {
-        return open_url(url);
+pub(crate) fn open_interactive(os: &OsStr) -> anyhow::Result<Interactive> {
+    if let Some(s) = os.to_str() {
+        // If we can parse it as a URL, treat it as such.
+        if let Ok(url) = Url::parse(s) {
+            return open_url(url);
+        }
+
+        // Special-case "-" to mean (stdin, stdout).
+        if s == "-" {
+            return acquire_stdin_stdout();
+        }
     }
 
-    // Special-case "-" to mean (stdin, stdout).
-    if s == "-" {
-        return acquire_stdin_stdout();
-    }
+    {
+        let lossy = os.to_string_lossy();
 
-    // Strings beginning with "$(" are commands.
-    #[cfg(not(windows))]
-    if s.starts_with("$(") {
-        return spawn_child(s);
+        // Strings beginning with "$(" are commands.
+        #[cfg(not(windows))]
+        if lossy.starts_with("$(") {
+            return spawn_child(os, &lossy);
+        }
     }
 
     // Otherwise try opening it as a path in the filesystem namespace.
-    open_path(Path::new(s))
+    open_path(Path::new(os))
 }
 
 fn acquire_stdin_stdout() -> anyhow::Result<Interactive> {
@@ -45,8 +53,8 @@ fn acquire_stdin_stdout() -> anyhow::Result<Interactive> {
 
 fn open_url(url: Url) -> anyhow::Result<Interactive> {
     match url.scheme() {
-        "connect" => open_connect_url_str(url),
-        "accept" => open_accept_url_str(url),
+        "connect" => open_connect_url(url),
+        "accept" => open_accept_url(url),
         scheme @ "http" | scheme @ "https" | scheme @ "file" | scheme @ "data" => {
             Err(anyhow!("non-interactive URL scheme \"{}\"", scheme))
         }
@@ -54,7 +62,7 @@ fn open_url(url: Url) -> anyhow::Result<Interactive> {
     }
 }
 
-fn open_connect_url_str(url: Url) -> anyhow::Result<Interactive> {
+fn open_connect_url(url: Url) -> anyhow::Result<Interactive> {
     if !url.username().is_empty()
         || url.password().is_some()
         || url.query().is_some()
@@ -73,7 +81,7 @@ fn open_connect_url_str(url: Url) -> anyhow::Result<Interactive> {
             None => return Err(anyhow!("TCP connect URL should have a host")),
         };
 
-        let duplexer = TcpStream::connect(format!("{}:{}", host_str, port))?;
+        let duplexer = TcpStream::connect((host_str, port))?;
         let duplexer = StreamDuplexer::tcp_stream(duplexer);
 
         return Ok(Interactive {
@@ -93,17 +101,19 @@ fn open_connect_url_str(url: Url) -> anyhow::Result<Interactive> {
         let duplexer = UnixStream::connect(url.path())?;
         let duplexer = StreamDuplexer::unix_stream(duplexer);
 
-        return Ok(Interactive {
+        Ok(Interactive {
             name: url.to_string(),
             duplexer,
-        });
+        })
     }
 
     #[cfg(windows)]
-    return Err(anyhow!("Unsupported connect URL: {}", url));
+    {
+        Err(anyhow!("Unsupported connect URL: {}", url))
+    }
 }
 
-fn open_accept_url_str(url: Url) -> anyhow::Result<Interactive> {
+fn open_accept_url(url: Url) -> anyhow::Result<Interactive> {
     if !url.username().is_empty()
         || url.password().is_some()
         || url.query().is_some()
@@ -122,7 +132,7 @@ fn open_accept_url_str(url: Url) -> anyhow::Result<Interactive> {
             None => return Err(anyhow!("accept URL should have a host")),
         };
 
-        let listener = TcpListener::bind(format!("{}:{}", host_str, port))?;
+        let listener = TcpListener::bind((host_str, port))?;
 
         let (duplexer, addr) = listener.accept()?;
         let duplexer = StreamDuplexer::tcp_stream(duplexer);
@@ -147,11 +157,13 @@ fn open_accept_url_str(url: Url) -> anyhow::Result<Interactive> {
         let duplexer = StreamDuplexer::unix_stream(duplexer);
         let name = path_to_name("accept", addr.as_pathname().unwrap())?;
 
-        return Ok(Interactive { name, duplexer });
+        Ok(Interactive { name, duplexer })
     }
 
     #[cfg(windows)]
-    return Err(anyhow!("Unsupported connect URL: {}", url));
+    {
+        Err(anyhow!("Unsupported connect URL: {}", url))
+    }
 }
 
 fn open_path(_path: &Path) -> anyhow::Result<Interactive> {
@@ -161,12 +173,17 @@ fn open_path(_path: &Path) -> anyhow::Result<Interactive> {
 }
 
 #[cfg(not(windows))]
-fn spawn_child(s: &str) -> anyhow::Result<Interactive> {
+fn spawn_child(os: &OsStr, lossy: &str) -> anyhow::Result<Interactive> {
     use std::process::Command;
-    assert!(s.starts_with("$("));
-    if !s.ends_with(')') {
+    assert!(lossy.starts_with("$("));
+    if !lossy.ends_with(')') {
         return Err(anyhow!("child string must end in ')'"));
     }
+    let s = if let Some(s) = os.to_str() {
+        s
+    } else {
+        return Err(anyhow!("Non-UTF-8 child strings not yet supported"));
+    };
     let words = shell_words::split(&s[2..s.len() - 1])?;
     let (first, rest) = words
         .split_first()
@@ -175,7 +192,7 @@ fn spawn_child(s: &str) -> anyhow::Result<Interactive> {
     command.args(rest);
     let duplexer = StreamDuplexer::duplex_with_command(command)?;
     Ok(Interactive {
-        name: s.to_owned(),
+        name: lossy.to_owned(),
         duplexer,
     })
 }

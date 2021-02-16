@@ -3,8 +3,10 @@ use anyhow::anyhow;
 use data_url::DataUrl;
 use flate2::read::GzDecoder;
 use io_streams::StreamReader;
-use std::{fs::File, path::Path, str::FromStr};
+use std::{convert::TryInto, ffi::OsStr, fs::File, path::Path, str::FromStr};
 use url::Url;
+#[cfg(feature = "ssh2")]
+use {percent_encoding::percent_decode, ssh2::Session, std::net::TcpStream};
 
 pub(crate) struct Input {
     pub(crate) name: String,
@@ -13,25 +15,31 @@ pub(crate) struct Input {
     pub(crate) initial_size: Option<u64>,
 }
 
-pub(crate) fn open_input(s: &str) -> anyhow::Result<Input> {
-    // If we can parse it as a URL, treat it as such.
-    if let Ok(url) = Url::parse(s) {
-        return open_url(url);
+pub(crate) fn open_input(os: &OsStr) -> anyhow::Result<Input> {
+    if let Some(s) = os.to_str() {
+        // If we can parse it as a URL, treat it as such.
+        if let Ok(url) = Url::parse(s) {
+            return open_url(url);
+        }
+
+        // Special-case "-" to mean stdin.
+        if s == "-" {
+            return acquire_stdin();
+        }
     }
 
-    // Special-case "-" to mean stdin.
-    if s == "-" {
-        return acquire_stdin();
-    }
+    {
+        let lossy = os.to_string_lossy();
 
-    // Strings beginning with "$(" are commands.
-    #[cfg(not(windows))]
-    if s.starts_with("$(") {
-        return spawn_child(s);
+        // Strings beginning with "$(" are commands.
+        #[cfg(not(windows))]
+        if lossy.starts_with("$(") {
+            return spawn_child(os, &lossy);
+        }
     }
 
     // Otherwise try opening it as a path in the filesystem namespace.
-    open_path(Path::new(s))
+    open_path(Path::new(os))
 }
 
 fn acquire_stdin() -> anyhow::Result<Input> {
@@ -65,6 +73,8 @@ fn open_url(url: Url) -> anyhow::Result<Input> {
                     .map_err(|_: ()| anyhow!("unknown file URL weirdness"))?,
             )
         }
+        #[cfg(feature = "ssh2")]
+        "scp" => open_scp_url(&url),
         other => Err(anyhow!("unsupported URL scheme \"{}\"", other)),
     }
 }
@@ -120,6 +130,54 @@ fn open_data_url_str(data_url_str: &str) -> anyhow::Result<Input> {
     })
 }
 
+// Handle URLs of the form `scp://[user@]host[:port][/path]`.
+#[cfg(feature = "ssh2")]
+fn open_scp_url(scp_url: &Url) -> anyhow::Result<Input> {
+    if scp_url.query().is_some() || scp_url.fragment().is_some() {
+        return Err(anyhow!("scp URL should only contain a socket address, optional username, optional password, and optional path"));
+    }
+
+    let host_str = match scp_url.host_str() {
+        Some(host_str) => host_str,
+        None => return Err(anyhow!("ssh URL should have a host")),
+    };
+    let port = match scp_url.port() {
+        Some(port) => port,
+        None => 22, // default ssh port
+    };
+    let tcp = TcpStream::connect((host_str, port))?;
+    let mut sess = Session::new().unwrap();
+    sess.set_tcp_stream(tcp);
+    sess.handshake().unwrap();
+
+    let username = if scp_url.username().is_empty() {
+        whoami::username()
+    } else {
+        scp_url.username().to_owned()
+    };
+    let username = percent_decode(username.as_bytes()).decode_utf8()?;
+
+    if let Some(password) = scp_url.password() {
+        let password = percent_decode(password.as_bytes()).decode_utf8()?;
+        sess.userauth_password(&username, &password)?;
+    } else {
+        sess.userauth_agent(&username)?;
+    }
+
+    assert!(sess.authenticated());
+
+    let path = Path::new(scp_url.path());
+    let (channel, stat) = sess.scp_recv(path)?;
+    let reader = StreamReader::piped_thread(Box::new(channel))?;
+    let type_ = Type::from_extension(path.extension());
+    Ok(Input {
+        name: scp_url.as_str().to_owned(),
+        reader,
+        type_,
+        initial_size: Some(stat.size()),
+    })
+}
+
 fn open_path(path: &Path) -> anyhow::Result<Input> {
     let name = path_to_name("file", path)?;
     // TODO: Should we have our own error type?
@@ -151,12 +209,17 @@ fn open_path(path: &Path) -> anyhow::Result<Input> {
 }
 
 #[cfg(not(windows))]
-fn spawn_child(s: &str) -> anyhow::Result<Input> {
+fn spawn_child(os: &OsStr, lossy: &str) -> anyhow::Result<Input> {
     use std::process::{Command, Stdio};
-    assert!(s.starts_with("$("));
-    if !s.ends_with(')') {
+    assert!(lossy.starts_with("$("));
+    if !lossy.ends_with(')') {
         return Err(anyhow!("child string must end in ')'"));
     }
+    let s = if let Some(s) = os.to_str() {
+        s
+    } else {
+        return Err(anyhow!("Non-UTF-8 child strings not yet supported"));
+    };
     let words = shell_words::split(&s[2..s.len() - 1])?;
     let (first, rest) = words
         .split_first()

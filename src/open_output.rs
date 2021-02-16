@@ -2,7 +2,7 @@ use crate::{path_to_name::path_to_name, Type};
 use anyhow::anyhow;
 use flate2::{write::GzEncoder, Compression};
 use io_streams::StreamWriter;
-use std::{fs::File, path::Path};
+use std::{ffi::OsStr, fs::File, path::Path};
 use url::Url;
 
 pub(crate) struct Output {
@@ -11,25 +11,31 @@ pub(crate) struct Output {
     pub(crate) type_: Type,
 }
 
-pub(crate) fn open_output(s: &str, type_: Type) -> anyhow::Result<Output> {
-    // If we can parse it as a URL, treat it as such.
-    if let Ok(url) = Url::parse(s) {
-        return open_url(url, type_);
+pub(crate) fn open_output(os: &OsStr, type_: Type) -> anyhow::Result<Output> {
+    if let Some(s) = os.to_str() {
+        // If we can parse it as a URL, treat it as such.
+        if let Ok(url) = Url::parse(s) {
+            return open_url(url, type_);
+        }
+
+        // Special-case "-" to mean stdout.
+        if s == "-" {
+            return acquire_stdout(type_);
+        }
     }
 
-    // Special-case "-" to mean stdout.
-    if s == "-" {
-        return acquire_stdout(type_);
-    }
+    {
+        let lossy = os.to_string_lossy();
 
-    // Strings beginning with "$(" are commands.
-    #[cfg(not(windows))]
-    if s.starts_with("$(") {
-        return spawn_child(s, type_);
+        // Strings beginning with "$(" are commands.
+        #[cfg(not(windows))]
+        if lossy.starts_with("$(") {
+            return spawn_child(os, &lossy, type_);
+        }
     }
 
     // Otherwise try opening it as a path in the filesystem namespace.
-    open_path(Path::new(s), type_)
+    open_path(Path::new(os), type_)
 }
 
 fn acquire_stdout(type_: Type) -> anyhow::Result<Output> {
@@ -98,12 +104,17 @@ fn open_path(path: &Path, type_: Type) -> anyhow::Result<Output> {
 }
 
 #[cfg(not(windows))]
-fn spawn_child(s: &str, type_: Type) -> anyhow::Result<Output> {
+fn spawn_child(os: &OsStr, lossy: &str, type_: Type) -> anyhow::Result<Output> {
     use std::process::{Command, Stdio};
-    assert!(s.starts_with("$("));
-    if !s.ends_with(')') {
+    assert!(lossy.starts_with("$("));
+    if !lossy.ends_with(')') {
         return Err(anyhow!("child string must end in ')'"));
     }
+    let s = if let Some(s) = os.to_str() {
+        s
+    } else {
+        return Err(anyhow!("Non-UTF-8 child strings not yet supported"));
+    };
     let words = shell_words::split(&s[2..s.len() - 1])?;
     let (first, rest) = words
         .split_first()
@@ -115,7 +126,7 @@ fn spawn_child(s: &str, type_: Type) -> anyhow::Result<Output> {
         .spawn()?;
     let writer = StreamWriter::child_stdin(child.stdin.unwrap());
     Ok(Output {
-        name: s.to_owned(),
+        name: lossy.to_owned(),
         writer,
         type_,
     })
