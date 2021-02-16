@@ -30,11 +30,6 @@
 //! Run it connected to the same program but use a socket instead of a
 //! pipe -- note that this opens a network port!
 //!
-//! Also note that this example doesn't quite work yet, because structopt
-//! parses arguments multiple times. See
-//! https://github.com/clap-rs/clap/pull/2206
-//! for details.
-//!
 //! ```
 //! $ cargo run --quiet --example repl accept://localhost:9999 &
 //! ...

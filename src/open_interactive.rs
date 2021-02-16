@@ -1,4 +1,5 @@
 use crate::path_to_name::path_to_name;
+use char_device::CharDevice;
 use anyhow::anyhow;
 use char_device::CharDevice;
 use io_streams::StreamDuplexer;
@@ -166,10 +167,11 @@ fn open_accept_url(url: Url) -> anyhow::Result<Interactive> {
     }
 }
 
-fn open_path(_path: &Path) -> anyhow::Result<Interactive> {
-    Err(anyhow!(
-        "interactive filesystem paths not supported on Windows yet"
-    ))
+fn open_path(path: &Path) -> anyhow::Result<Interactive> {
+    let name = path_to_name("file", path)?;
+    let duplexer = CharDevice::open(path)?;
+    let duplexer = StreamDuplexer::char_device(duplexer);
+    Ok(Interactive { name, duplexer })
 }
 
 #[cfg(not(windows))]
