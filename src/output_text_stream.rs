@@ -226,6 +226,7 @@ impl WriteTerminal for OutputTextStream {
 }
 
 impl WriteText for OutputTextStream {
+    #[inline]
     fn write_text(&mut self, buf: &TextStr) -> io::Result<()> {
         self.writer.write_text(buf)
     }

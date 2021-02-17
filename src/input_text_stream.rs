@@ -173,20 +173,24 @@ impl ReadStrLayered for InputTextStream {
 }
 
 impl ReadText for InputTextStream {
+    #[inline]
     fn read_text(&mut self, buf: &mut TextStr) -> io::Result<usize> {
         self.reader.read_text(buf)
     }
 
+    #[inline]
     fn read_exact_text(&mut self, buf: &mut TextStr) -> io::Result<()> {
         self.reader.read_exact_text(buf)
     }
 }
 
 impl ReadTextLayered for InputTextStream {
+    #[inline]
     fn read_text_with_status(&mut self, buf: &mut TextStr) -> io::Result<(usize, Status)> {
         self.reader.read_text_with_status(buf)
     }
 
+    #[inline]
     fn read_exact_text_using_status(&mut self, buf: &mut TextStr) -> io::Result<Status> {
         self.reader.read_exact_text_using_status(buf)
     }

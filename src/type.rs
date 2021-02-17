@@ -68,11 +68,13 @@ impl Type {
     }
 
     /// Return the Media Type, which is "*/*" if unknown.
+    #[inline]
     pub fn mime(&self) -> &Mime {
         &self.mime
     }
 
     /// Return the filename extension, which is empty if unknown.
+    #[inline]
     pub fn extension(&self) -> &str {
         &self.extension
     }
