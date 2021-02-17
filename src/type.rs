@@ -81,20 +81,20 @@ impl Type {
     /// back to `Type::unknown()` if it cannot be determined.
     pub fn merge(self, other: Self) -> Self {
         if self == other {
-            self.clone()
+            self
         } else if other == Type::unknown() {
-            self.clone()
+            self
         } else if self == Type::unknown() {
-            other.clone()
+            other
         } else if other == Type::text() {
             if self.mime.type_() == other.mime.type_() {
-                self.clone()
+                self
             } else {
                 Type::unknown()
             }
         } else if self == Type::text() {
             if self.mime.type_() == other.mime.type_() {
-                other.clone()
+                other
             } else {
                 Type::unknown()
             }
