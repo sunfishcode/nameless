@@ -1,3 +1,4 @@
+use std::convert::TryInto;
 use crate::{path_to_name::path_to_name, Mime, Type};
 use anyhow::anyhow;
 use data_url::DataUrl;
@@ -126,7 +127,7 @@ fn open_data_url_str(data_url_str: &str) -> anyhow::Result<Input> {
         name: data_url_str.to_owned(),
         reader,
         type_,
-        initial_size: Some(data_url_str.len() as u64),
+        initial_size: Some(data_url_str.len().try_into().unwrap()),
     })
 }
 
