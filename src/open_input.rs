@@ -1,4 +1,3 @@
-use std::convert::TryInto;
 use crate::{path_to_name::path_to_name, Mime, Type};
 use anyhow::anyhow;
 use data_url::DataUrl;

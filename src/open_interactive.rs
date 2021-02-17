@@ -1,5 +1,4 @@
 use crate::path_to_name::path_to_name;
-use char_device::CharDevice;
 use anyhow::anyhow;
 use char_device::CharDevice;
 use io_streams::StreamDuplexer;
