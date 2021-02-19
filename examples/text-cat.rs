@@ -5,16 +5,15 @@ use basic_text::copy_text;
 use itertools::Itertools;
 use nameless::{InputTextStream, LazyOutput, OutputTextStream, Type};
 
-#[rustfmt::skip] // TODO: rustfmt mishandles doc comments on arguments
+/// # Arguments
+///
+/// * `inputs` - Input sources, stdin if none
 #[kommand::main]
-fn main(
-    output: LazyOutput<OutputTextStream>,
-
-    /// Input sources, stdin if none.
-    inputs: Vec<InputTextStream>
-) -> anyhow::Result<()> {
+fn main(output: LazyOutput<OutputTextStream>, inputs: Vec<InputTextStream>) -> anyhow::Result<()> {
     let type_ = match inputs.iter().next() {
-        Some(first) if inputs.iter().map(InputTextStream::type_).all_equal() => first.type_().clone(),
+        Some(first) if inputs.iter().map(InputTextStream::type_).all_equal() => {
+            first.type_().clone()
+        }
         _ => Type::text(),
     };
 

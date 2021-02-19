@@ -5,11 +5,10 @@
 
 use humantime::Duration;
 
-#[rustfmt::skip] // TODO: rustfmt mishandles doc comments on arguments
+/// # Arguments
+///
+/// * `duration` - Time to sleep
 #[kommand::main]
-fn main(
-    /// Time to sleep
-    duration: Duration,
-) {
+fn main(duration: Duration) {
     std::thread::sleep(duration.into());
 }

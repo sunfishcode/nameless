@@ -5,15 +5,14 @@ use nameless::{InputTextStream, LazyOutput, OutputTextStream, Type};
 use regex::Regex;
 use std::io::{BufRead, BufReader, Write};
 
-#[rustfmt::skip] // TODO: rustfmt mishandles doc comments on arguments
+/// # Arguments
+///
+/// * `pattern` - The regex to search for
+/// * `inputs` - Input sources
 #[kommand::main]
 fn main(
-    /// The regex to search for.
     pattern: Regex,
-
     output: LazyOutput<OutputTextStream>,
-
-    /// Input sources.
     inputs: Vec<InputTextStream>,
 ) -> anyhow::Result<()> {
     let mut output = output.materialize(Type::text())?;

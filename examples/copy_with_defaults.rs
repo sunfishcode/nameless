@@ -5,15 +5,12 @@ use clap::TryFromOsArg;
 use nameless::{InputByteStream, OutputByteStream};
 use std::io::copy;
 
-#[rustfmt::skip] // TODO: rustfmt mishandles doc comments on arguments
+/// # Arguments
+///
+/// * `input` - Input source, stdin if not present
+/// * `output` - Output sink, stdout if not present
 #[kommand::main]
-fn main(
-    /// Input source, stdin if not present
-    input: Option<InputByteStream>,
-
-    /// Output sink, stdout if not present
-    output: Option<OutputByteStream>,
-) -> anyhow::Result<()> {
+fn main(input: Option<InputByteStream>, output: Option<OutputByteStream>) -> anyhow::Result<()> {
     let mut input = if let Some(input) = input {
         input
     } else {

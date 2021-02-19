@@ -5,12 +5,11 @@ use clap::TryFromOsArg;
 use nameless::{InputTextStream, OutputTextStream};
 use std::io::copy;
 
-#[rustfmt::skip] // TODO: rustfmt mishandles doc comments on arguments
+/// # Arguments
+///
+/// * `inputs` - Input sources, stdin if none
 #[kommand::main]
-fn main(
-    /// Input sources, stdin if none.
-    inputs: Vec<InputTextStream>
-) -> anyhow::Result<()> {
+fn main(inputs: Vec<InputTextStream>) -> anyhow::Result<()> {
     let mut output = OutputTextStream::try_from_os_str_arg("-".as_ref())?;
 
     for mut input in inputs {

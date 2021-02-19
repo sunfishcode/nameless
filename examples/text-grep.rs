@@ -6,15 +6,12 @@ use nameless::{InputTextStream, OutputTextStream};
 use regex::Regex;
 use std::io::{self, BufRead, BufReader, Write};
 
-#[rustfmt::skip] // TODO: rustfmt mishandles doc comments on arguments
+/// # Arguments
+///
+/// * `pattern` - The regex to search for
+/// * `inputs` - Input sources, stdin if none
 #[kommand::main]
-fn main(
-    /// The regex to search for.
-    pattern: Regex,
-
-    /// Input sources, stdin if none.
-    mut inputs: Vec<InputTextStream>,
-) -> anyhow::Result<()> {
+fn main(pattern: Regex, mut inputs: Vec<InputTextStream>) -> anyhow::Result<()> {
     let mut output = OutputTextStream::try_from_os_str_arg("-".as_ref())?;
 
     if inputs.is_empty() {

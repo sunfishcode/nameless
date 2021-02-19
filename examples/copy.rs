@@ -4,15 +4,12 @@
 use nameless::{InputByteStream, OutputByteStream};
 use std::io::copy;
 
-#[rustfmt::skip] // TODO: rustfmt mishandles doc comments on arguments
+/// # Arguments
+///
+/// * `input` - Input source
+/// * `output` - Output sink
 #[kommand::main]
-fn main(
-    /// Input source
-    mut input: InputByteStream,
-
-    /// Output sink
-    mut output: OutputByteStream,
-) -> anyhow::Result<()> {
+fn main(mut input: InputByteStream, mut output: OutputByteStream) -> anyhow::Result<()> {
     copy(&mut input, &mut output)?;
 
     Ok(())
