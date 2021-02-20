@@ -1,8 +1,8 @@
 use crate::{
+    clap::TryFromOsArg,
     open_input::{open_input, Input},
     Pseudonym, Type,
 };
-use clap::TryFromOsArg;
 use io_streams::StreamReader;
 use layered_io::{Bufferable, LayeredReader, ReadLayered, Status};
 use std::{

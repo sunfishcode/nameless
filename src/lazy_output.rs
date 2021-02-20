@@ -1,5 +1,4 @@
-use crate::Type;
-use clap::TryFromOsArg;
+use crate::{clap::TryFromOsArg, Type};
 use std::{
     error::Error,
     ffi::{OsStr, OsString},

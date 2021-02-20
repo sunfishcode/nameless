@@ -141,6 +141,7 @@
 
 pub use mime::Mime;
 
+pub(crate) mod clap;
 mod input_byte_stream;
 mod input_text_stream;
 mod interactive_byte_stream;
@@ -157,6 +158,7 @@ mod pseudonym;
 mod summon_bat;
 mod r#type;
 
+pub use crate::clap::TryFromOsArg;
 pub use input_byte_stream::InputByteStream;
 pub use input_text_stream::InputTextStream;
 pub use interactive_byte_stream::InteractiveByteStream;

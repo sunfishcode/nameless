@@ -16,7 +16,8 @@ rustc_version = "0.3.0"
 [dependencies]
 anyhow = "1.0.35"
 char-device = "0.1.0"
-clap = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
+# Temporarily disable and use lib/clap.rs instead.
+#clap = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
 data-url = "0.1.0"
 duplex = { version = "0.1.1", features = ["ssh2"] }
 flate2 = "1.0.19"
@@ -55,8 +56,9 @@ itertools = "0.10.0"
 #  - https://github.com/clap-rs/clap/pull/2206
 #  - https://github.com/clap-rs/clap/pull/2298
 # So we use our own git dependencies for now.
-clap = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
-clap_derive = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
+# But, temporarily disable for now so that we can publish on crates.io.
+#clap = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
+#clap_derive = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
 
 [badges]
 maintenance = { status = "actively-developed" }

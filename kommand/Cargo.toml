@@ -20,8 +20,9 @@ quote = "1.0.2"
 pulldown-cmark = "0.8.0"
 
 [dev-dependencies]
-clap = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
-clap_derive = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
+# Temporarily disable for now so that we can publish on crates.io.
+#clap = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
+#clap_derive = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
 
 [badges]
 maintenance = { status = "actively-developed" }
