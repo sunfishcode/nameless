@@ -24,7 +24,6 @@ flate2 = "1.0.19"
 layered-io = { version = "0.2.0", features = ["terminal-io"] }
 io-streams = { version = "0.2.1", features = ["layered-io", "terminal-io", "use-char-device", "use-socketpair"] }
 io-arrays = "0.2.0"
-memchr = "2.3.4"
 mime = "0.3.16"
 mime_guess = "2.0.3"
 percent-encoding = "2.1.0"
