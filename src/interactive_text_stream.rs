@@ -46,8 +46,8 @@ impl InteractiveTextStream {
     }
 
     /// Write the name of the given output stream to the output stream. This is
-    /// needed because the name of an `InteractiveTextStream` is not available in
-    /// the public API.
+    /// needed because the name of an `InteractiveTextStream` is not available
+    /// in the public API.
     #[inline]
     pub fn pseudonym(&self) -> Pseudonym {
         Pseudonym::new(self.name.clone())

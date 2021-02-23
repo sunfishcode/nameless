@@ -80,12 +80,7 @@ impl OutputTextStream {
     }
 
     fn from_output(output: Output) -> Self {
-        let is_stdout = unsafe {
-            output
-                .writer
-                .as_unsafe_handle()
-                .eq(std::io::stdout().as_unsafe_handle())
-        };
+        let is_stdout = output.writer.eq_handle(&std::io::stdout());
         let terminal = TerminalWriter::with_handle(output.writer);
         let is_terminal = terminal.is_output_terminal();
         let color_support = terminal.color_support();

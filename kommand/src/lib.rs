@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use proc_macro::TokenStream;
 use proc_macro2::{Literal as Literal2, Span as Span2, TokenTree as TokenTree2};
 use pulldown_cmark::{Event, OffsetIter, Options, Parser, Tag};

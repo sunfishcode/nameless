@@ -135,6 +135,7 @@
 //! — <cite>"Through the Looking Glass", by Lewis Carroll</cite>
 
 #![deny(missing_docs)]
+#![forbid(unsafe_code)]
 #![cfg_attr(read_initializer, feature(read_initializer))]
 #![cfg_attr(can_vector, feature(can_vector))]
 #![cfg_attr(write_all_vectored, feature(write_all_vectored))]
