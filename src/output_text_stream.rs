@@ -1,12 +1,12 @@
 #[cfg(unix)]
 use crate::summon_bat::summon_bat;
 use crate::{
-    clap::TryFromOsArg,
     lazy_output::FromLazyOutput,
     open_output::{open_output, Output},
     Pseudonym, Type,
 };
 use basic_text::{TextStr, TextWriter, WriteText};
+use clap::TryFromOsArg;
 use io_streams::StreamWriter;
 use layered_io::{Bufferable, LayeredWriter, WriteLayered};
 #[cfg(all(not(unix), not(windows)))]

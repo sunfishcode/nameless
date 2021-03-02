@@ -1,10 +1,10 @@
 use crate::{
-    clap::TryFromOsArg,
     lazy_output::FromLazyOutput,
     open_output::{open_output, Output},
     Pseudonym, Type,
 };
 use anyhow::anyhow;
+use clap::TryFromOsArg;
 use io_streams::StreamWriter;
 use layered_io::{Bufferable, LayeredWriter, WriteLayered};
 use std::{

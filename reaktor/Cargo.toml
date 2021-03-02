@@ -19,9 +19,8 @@ proc-macro2 = { version = "1.0.2", features = ["nightly"] }
 quote = "1.0.2"
 
 [dev-dependencies]
-# Temporarily disable for now so that we can publish on crates.io.
-#clap = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
-#clap_derive = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
+clap = "3.0.0-beta.2"
+clap_derive = "3.0.0-beta.2"
 
 [badges]
 maintenance = { status = "actively-developed" }

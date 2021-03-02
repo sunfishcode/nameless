@@ -1,9 +1,9 @@
 use crate::{
-    clap::TryFromOsArg,
     open_interactive::{open_interactive, Interactive},
     Pseudonym,
 };
 use basic_text::TextDuplexer;
+use clap::TryFromOsArg;
 use duplex::Duplex;
 use io_streams::StreamDuplexer;
 use layered_io::{Bufferable, LayeredDuplexer, ReadLayered, Status, WriteLayered};

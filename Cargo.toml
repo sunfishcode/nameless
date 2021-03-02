@@ -16,8 +16,7 @@ rustc_version = "0.3.3"
 [dependencies]
 anyhow = "1.0.35"
 char-device = "0.3.0"
-# Temporarily disable and use lib/clap.rs instead.
-#clap = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
+clap = { version = "3.0.0-beta.2", package = "nameless-clap" }
 data-url = "0.1.0"
 duplex = { version = "0.3.0", features = ["ssh2"] }
 flate2 = "1.0.19"
@@ -51,13 +50,8 @@ kommand = { path = "kommand" }
 reaktor = { path = "reaktor" }
 regex = "1.4.2"
 itertools = "0.10.0"
-# We need to add a few patches in clap. We've submitted the patches upstream:
-#  - https://github.com/clap-rs/clap/pull/2206
-#  - https://github.com/clap-rs/clap/pull/2298
-# So we use our own git dependencies for now.
-# But, temporarily disable for now so that we can publish on crates.io.
-#clap = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
-#clap_derive = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
+clap = { version = "3.0.0-beta.2", package = "nameless-clap" }
+clap_derive = { version = "3.0.0-beta.2", package = "nameless-clap_derive" }
 
 [badges]
 maintenance = { status = "actively-developed" }
