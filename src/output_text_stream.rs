@@ -78,10 +78,14 @@ impl OutputTextStream {
     }
 
     fn from_output(output: Output) -> Self {
+        #[cfg(unix)]
         let is_stdout = output.writer.eq_handle(&std::io::stdout());
         let terminal = TerminalWriter::with_handle(output.writer);
+        #[cfg(unix)]
         let is_terminal = terminal.is_output_terminal();
+        #[cfg(unix)]
         let color_support = terminal.color_support();
+        #[cfg(unix)]
         let color_preference = terminal.color_preference();
 
         #[cfg(unix)]

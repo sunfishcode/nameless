@@ -28,11 +28,11 @@ pub(crate) fn open_input(os: &OsStr) -> anyhow::Result<Input> {
         }
     }
 
+    #[cfg(not(windows))]
     {
         let lossy = os.to_string_lossy();
 
         // Strings beginning with "$(" are commands.
-        #[cfg(not(windows))]
         if lossy.starts_with("$(") {
             return spawn_child(os, &lossy);
         }

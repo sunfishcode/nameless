@@ -29,11 +29,11 @@ pub(crate) fn open_interactive(os: &OsStr) -> anyhow::Result<Interactive> {
         }
     }
 
+    #[cfg(not(windows))]
     {
         let lossy = os.to_string_lossy();
 
         // Strings beginning with "$(" are commands.
-        #[cfg(not(windows))]
         if lossy.starts_with("$(") {
             return spawn_child(os, &lossy);
         }
