@@ -7,8 +7,6 @@ use clap::TryFromOsArg;
 use duplex::Duplex;
 use io_streams::StreamDuplexer;
 use layered_io::{Bufferable, LayeredDuplexer, ReadLayered, Status, WriteLayered};
-#[cfg(windows)]
-use std::os::windows::io::FromRawHandle;
 use std::{
     ffi::OsStr,
     fmt::{self, Arguments, Debug, Formatter},

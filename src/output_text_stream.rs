@@ -11,8 +11,6 @@ use io_streams::StreamWriter;
 use layered_io::{Bufferable, LayeredWriter, WriteLayered};
 #[cfg(all(not(unix), not(windows)))]
 use std::os::unix::io::{AsRawFd, FromRawFd};
-#[cfg(windows)]
-use std::os::windows::io::{AsRawHandle, FromRawHandle};
 use std::{
     ffi::{OsStr, OsString},
     fmt::{self, Arguments, Debug, Formatter},
