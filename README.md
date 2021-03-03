@@ -14,16 +14,6 @@
 
 This is currently an early experiment, though a lot of things are working.
 
-The `kommand` crate and many of the examples in this repository depend on
-[a fork of clap]. See the README.md in that repository for details. As a user,
-to pull in the requisite support add the following to Cargo.toml:
-```toml
-clap = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
-clap_derive = { git = "https://github.com/sunfishcode/clap", branch = "try-from-os-arg" }
-```
-
-[a fork of clap]: https://github.com/sunfishcode/clap/tree/try-from-os-arg
-
 Currently, `http:`, `https:`, `file:`, and `data:` URLs are supported. Plain
 filesystem paths are also accepted, files with names ending with ".gz" are
 decompressed on the fly, "-" means stdin or stdout, and "$(...)" means to run
