@@ -11,13 +11,12 @@
 //!  - New stream types, [`InputByteStream`], [`OutputByteStream`], and
 //!    [`InteractiveByteStream`], which implement [`Read`], [`Write`], and both,
 //!    respectively, which you can use in type-aware command-line parsing
-//!    packages such as [`structopt`], [`clap-v3`], or this library's own
-//!    [`kommand`].
+//!    packages such as [`clap_derive`] or this library's own [`kommand`].
 //!
 //!  - A new command-line parsing package, [`kommand`], which is similar to
-//!    (and built on) [`structopt`] with [`paw`] support enabled, but which goes
-//!    a step further and uses function argument syntax instead of having an
-//!    options struct.
+//!    (and built on) [`clap_derive`], which is built from [`structopt`], with
+//!    [`paw`] support enabled, but which goes a step further and uses function
+//!    argument syntax instead of having an options struct.
 //!
 //! When using these features, boilerplate for converting command-line argument
 //! strings into open files is abstracted away, allowing this library to
@@ -29,7 +28,7 @@
 //! deterministic-build environments.
 //!
 //! [`structopt`]: https://crates.io/crates/structopt
-//! [`clap-v3`]: https://crates.io/crates/clap-v3
+//! [`clap_derive`]: https://crates.io/crates/clap_derive
 //! [`paw`]: https://crates.io/crates/paw
 //! [`kommand`]: https://crates.io/crates/kommand
 //! [`Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
@@ -37,11 +36,11 @@
 //!
 //! # Example
 //!
-//! Using [`structopt`]:
+//! Using [`clap_derive`]:
 //!
 //! ```rust,ignore
-//! #[derive(StructOpt)]
-//! #[structopt(about = "A simple filter program with input and output")]
+//! #[derive(Clap)]
+//! #[clap(about = "A simple filter program with input and output")]
 //! struct Opt {
 //!     /// Input source
 //!     input: InputByteStream,
@@ -98,7 +97,7 @@
 //! $ cargo run -- https://example.com out.txt
 //! ```
 //!
-//! With either [`structopt`] or [`kommand`], command-line arguments can
+//! With either [`clap_derive`] or [`kommand`], command-line arguments can
 //! use any type which implements `FromStr`, including builtin types like `i32` or `bool`
 //! or library types like [`Regex`] or [`Duration`]. See [the examples directory] for
 //! more examples.

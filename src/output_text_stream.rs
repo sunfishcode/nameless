@@ -33,9 +33,9 @@ use utf8_io::{Utf8Writer, WriteStr};
 /// recommended for performance.
 ///
 /// The primary way to construct an `OutputTextStream` is to use it as
-/// a type in a `StructOpt` struct. Command-line arguments will then
-/// be automatically converted into output streams. Currently supported
-/// syntaxes include:
+/// a type in a `kommand` argument or a `clap_derive` struct. Command-line
+/// arguments will then be automatically converted into output streams.
+/// Currently supported syntaxes include:
 ///  - Names starting with `file:` are interpreted as local filesystem
 ///    URLs providing paths to files to open.
 ///  - "-" is interpreted as standard output.
@@ -123,11 +123,11 @@ impl OutputTextStream {
     }
 }
 
-/// Implement `From<&OsStr>` so that `structopt` can parse `OutputTextStream`
-/// objects automatically. For now, hide this from the documentation as it's
-/// not clear if we want to commit to this approach. Two potential concerns:
-///  - This uses `str` so it only handles well-formed Unicode paths.
-///  - Opening resources from strings depends on ambient authorities.
+/// Implement `From<&OsStr>` so that `clap_derive` can parse `OutputTextStream`
+/// objects automatically.
+///
+/// This is hidden from the documentation as it opens resources from
+/// strings using ambient authorities.
 #[doc(hidden)]
 impl TryFromOsArg for OutputTextStream {
     type Error = anyhow::Error;

@@ -21,9 +21,9 @@ use utf8_io::{ReadStr, ReadStrLayered, Utf8Duplexer, WriteStr};
 /// to be used with interactive streams.
 ///
 /// The primary way to construct an `InteractiveTextStream` is to use it as
-/// a type in a `StructOpt` struct. Command-line arguments will then
-/// be automatically converted into input streams. Currently supported
-/// syntaxes include:
+/// a type in a `kommand` argument or `clap_derive` struct. Command-line
+/// arguments will then be automatically converted into input streams.
+/// Currently supported syntaxes include:
 ///  - Names starting with `connect:` or `accept:`, which are
 ///    interpreted as socket addresses to connect to or accept from.
 ///    Socket addresses may contain host:port pairs or, on platforms which
@@ -63,11 +63,11 @@ impl InteractiveTextStream {
     }
 }
 
-/// Implement `FromStr` so that `structopt` can parse `InteractiveTextStream`
-/// arguments automatically. For now, hide this from the documentation as it's
-/// not clear if we want to commit to this approach. Two potential concerns:
-///  - This uses `str` so it only handles well-formed Unicode paths.
-///  - Opening resources from strings depends on ambient authorities.
+/// Implement `FromStr` so that `clap_derive` can parse `InteractiveTextStream`
+/// arguments automatically.
+///
+/// This is hidden from the documentation as it opens resources from
+/// strings using ambient authorities.
 #[doc(hidden)]
 impl TryFromOsArg for InteractiveTextStream {
     type Error = anyhow::Error;

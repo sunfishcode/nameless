@@ -23,9 +23,9 @@ use terminal_io::NeverTerminalReader;
 /// ease of use.
 ///
 /// The primary way to construct an `InputByteStream` is to use it as
-/// a type in a `StructOpt` struct. Command-line arguments will then
-/// be automatically converted into input streams. Currently supported
-/// syntaxes include:
+/// a type in a `kommand` argument or `clap_derive` struct. Command-line
+/// arguments will then be automatically converted into input streams.
+/// Currently supported syntaxes include:
 ///  - Names starting with `https:` or `http:`, which are interpreted
 ///    as URLs to open.
 ///  - Names starting with `data:` are interpreted as data URLs proving
@@ -85,11 +85,11 @@ impl InputByteStream {
     }
 }
 
-/// Implement `FromStr` so that `structopt` can parse `InputByteStream`
-/// arguments automatically. For now, hide this from the documentation as it's
-/// not clear if we want to commit to this approach. Two potential concerns:
-///  - This uses `str` so it only handles well-formed Unicode paths.
-///  - Opening resources from strings depends on ambient authorities.
+/// Implement `TryFromOsArg` so that `clap_derive` can parse InputByteStream`
+/// arguments automatically.
+///
+/// This is hidden from the documentation as it opens resources from
+/// strings using ambient authorities.
 #[doc(hidden)]
 impl TryFromOsArg for InputByteStream {
     type Error = anyhow::Error;

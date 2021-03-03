@@ -26,13 +26,12 @@ This library provides:
  - New stream types, [`InputByteStream`], [`OutputByteStream`], and
    [`InteractiveByteStream`], which implement [`Read`], [`Write`], and both,
    respectively, which you can use in type-aware command-line parsing
-   packages such as [`structopt`], [`clap-v3`], [`argh`], [`gumdrop`], or this
-   library's own [`kommand`].
+   packages such as [`clap_derive`] or this library's own [`kommand`].
 
  - A new command-line parsing package, [`kommand`], which is similar to
-   (and built on) [`structopt`] with [`paw`] support enabled, but which goes
-   a step further and uses function argument syntax instead of having an
-   options struct.
+   (and built on) [`clap_derive`], which is in turn derived from [`structopt`].
+   It is similar to [`paw`], but uses function argument syntax instead of
+   having an options struct.
 
  - New buffered I/O helpers, [`BufInteractor`] and [`BufReaderLineWriter`],
    which work like [`BufReader`] combined with [`BufWriter`] and [`LineWriter`]
@@ -49,9 +48,7 @@ the names of files it accesses, which is a common source of trouble in
 deterministic-build environments.
 
 [`structopt`]: https://crates.io/crates/structopt
-[`clap-v3`]: https://crates.io/crates/clap-v3
-[`argh`]: https://crates.io/crates/argh
-[`gumdrop`]: https://crates.io/crates/gumdrop
+[`clap_derive`]: https://crates.io/crates/clap_derive
 [`paw`]: https://crates.io/crates/paw
 [`kommand`]: https://crates.io/crates/kommand
 [`BufReader`]: https://doc.rust-lang.org/std/io/struct.BufReader.html
@@ -77,11 +74,11 @@ fn main(mut input: InputByteStream, mut output: OutputByteStream) {
 }
 ```
 
-Using [`structopt`]:
+Using [`clap_derive`]:
 
 ```rust
-#[derive(StructOpt)]
-#[structopt(about = "A simple filter program with input and output")]
+#[derive(Clap)]
+#[clap(about = "A simple filter program with input and output")]
 struct Opt {
     /// Input source
     input: InputByteStream,
@@ -122,7 +119,7 @@ The arguments can then be a variety of kinds, including URLs and files:
 $ cargo run -- https://example.com out.txt
 ```
 
-With either [`structopt`] or [`kommand`], command-line arguments can
+With either [`clap_derive`] or [`kommand`], command-line arguments can
 use any type which implements `FromStr`, including builtin types like `i32` or `bool`
 or library types like [`Regex`] or [`Duration`]. See [the examples directory] for
 more examples.

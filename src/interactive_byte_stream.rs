@@ -23,9 +23,9 @@ use terminal_io::{
 /// to be used with interactive streams.
 ///
 /// The primary way to construct an `InteractiveByteStream` is to use it as
-/// a type in a `StructOpt` struct. Command-line arguments will then
-/// be automatically converted into input streams. Currently supported
-/// syntaxes include:
+/// a type in a `kommand` argument or `clap_derive` struct. Command-line
+/// arguments will then be automatically converted into input streams.
+/// Currently supported syntaxes include:
 ///  - Names starting with `connect:` or `accept:`, which are
 ///    interpreted as socket addresses to connect to or accept from.
 ///    Socket addresses may contain host:port pairs or, on platforms which
@@ -56,11 +56,11 @@ impl InteractiveByteStream {
     }
 }
 
-/// Implement `FromStr` so that `structopt` can parse `InteractiveByteStream`
-/// arguments automatically. For now, hide this from the documentation as it's
-/// not clear if we want to commit to this approach. Two potential concerns:
-///  - This uses `str` so it only handles well-formed Unicode paths.
-///  - Opening resources from strings depends on ambient authorities.
+/// Implement `TryFromOsArg` so that `clap_derive` can parse
+/// `InteractiveByteStream` arguments automatically.
+///
+/// This is hidden from the documentation as it opens resources from
+/// strings using ambient authorities.
 #[doc(hidden)]
 impl TryFromOsArg for InteractiveByteStream {
     type Error = anyhow::Error;
