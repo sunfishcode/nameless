@@ -9,6 +9,7 @@
     <a href="https://github.com/sunfishcode/nameless/actions?query=workflow%3ACI"><img src="https://github.com/sunfishcode/nameless/workflows/CI/badge.svg" alt="Github Actions CI Status" /></a>
     <a href="https://crates.io/crates/nameless"><img src="https://img.shields.io/crates/v/nameless.svg" alt="crates.io page" /></a>
     <a href="https://docs.rs/nameless"><img src="https://docs.rs/nameless/badge.svg" alt="docs.rs docs" /></a>
+    <a href="https://bytecodealliance.zulipchat.com/#narrow/stream/219900-wasi"><img src="https://img.shields.io/badge/zulip-join_chat-brightgreen.svg" alt="zulip chat" /></a>
   </p>
 </div>
 
@@ -125,6 +126,11 @@ Hiding the names also helps programs avoid accidentally having behavior that
 depends on the names of files it accesses, which is a common source of trouble
 in deterministic-build environments.
 
+## Looking forward
+
+Nameless is actively evolving! Watch this space for much more to come, and
+[chat with us in Zulip], if you're interested in where we're going.
+
 ## Literary reference
 
 > ‘This must be the wood,’ she said thoughtfully to herself, ‘where things
@@ -152,3 +158,4 @@ in deterministic-build environments.
 [`pseudonym`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html#method.pseudonym
 [media type]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types
 [`type_`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html#method.type_
+[chat with us in Zulip]: https://bytecodealliance.zulipchat.com/#narrow/stream/219900-wasi
