@@ -2,7 +2,7 @@
   <h1><code>nameless</code></h1>
 
   <p>
-    <strong>Portable everything-is-a-URL</strong>
+    <strong>Full-service command-line parsing</strong>
   </p>
 
   <p>
@@ -12,95 +12,44 @@
   </p>
 </div>
 
-This is currently an early experiment, though a lot of things are working.
-
-Currently, `http:`, `https:`, `file:`, and `data:` URLs are supported. Plain
-filesystem paths are also accepted, files with names ending with ".gz" are
-decompressed on the fly, "-" means stdin or stdout, and "$(...)" means to run
-a child process and pipe to its stdin or stdout.
-
-## Overview
-
-This library provides:
-
- - New stream types, [`InputByteStream`], [`OutputByteStream`], and
-   [`InteractiveByteStream`], which implement [`Read`], [`Write`], and both,
-   respectively, which you can use in type-aware command-line parsing
-   packages such as [`clap_derive`] or this library's own [`kommand`].
-
- - A new command-line parsing package, [`kommand`], which is similar to
-   (and built on) [`clap_derive`], which is in turn derived from [`structopt`].
-   It is similar to [`paw`], but uses function argument syntax instead of
-   having an options struct.
-
- - New buffered I/O helpers, [`BufInteractor`] and [`BufReaderLineWriter`],
-   which work like [`BufReader`] combined with [`BufWriter`] and [`LineWriter`]
-   respectively, and a [`ReadWrite`] trait which combines [`Read`] and [`Write`],
-   for working with [`InteractiveByteStream`]s.
-
-When using these features, boilerplate for converting command-line argument
-strings into open files is abstracted away, allowing this library to
-transparently provide more features such as URLs, gzip'd files, stdin and
-stdout, and child processes.
-
-It also helps programs avoid accidentally having behavior that depends on
-the names of files it accesses, which is a common source of trouble in
-deterministic-build environments.
-
-[`structopt`]: https://crates.io/crates/structopt
-[`clap_derive`]: https://crates.io/crates/clap_derive
-[`paw`]: https://crates.io/crates/paw
-[`kommand`]: https://crates.io/crates/kommand
-[`BufReader`]: https://doc.rust-lang.org/std/io/struct.BufReader.html
-[`BufWriter`]: https://doc.rust-lang.org/std/io/struct.BufWriter.html
-[`LineWriter`]: https://doc.rust-lang.org/std/io/struct.LineWriter.html
-[`Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
-[`Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
-
-## Example
-
-Using [`kommand`]:
+Nameless provides full-service command-line parsing. This means you just write
+a `main` function with arguments with the types you want, add a [conventional]
+documentation comment, and it takes care of the rest:
 
 ```rust
-/// A simple filter program with input and output
+use nameless::{InputByteStream, OutputByteStream};
+use std::io::{self, Read, Write};
+
+/// A simple program with input and output
 ///
 /// # Arguments
 ///
 /// * `input` - Input source
 /// * `output` - Output sink
 #[kommand::main]
-fn main(mut input: InputByteStream, mut output: OutputByteStream) {
-    // ... use `input` and `output`
+fn main(mut input: InputByteStream, mut output: OutputByteStream) -> io::Result<()> {
+    let mut s = String::new();
+    input.read_to_string(&mut s)?;
+    output.write_all(s.as_bytes())
 }
 ```
 
-Using [`clap_derive`]:
+Nameless completely handles "string to stream" translation. And in doing so, it
+doesn't just support files, but also gzipped files (`\*.gz`),
+stdin/stdout (`-`), child processes (`$(...)`), and URLs, including `http:`,
+`https:`, `scp:` (enable the "ssh2" feature), `file:`, and `data:`. So while
+your code is busy doing one thing and doing it well, nameless takes care of
+streaming the data in and out. "Everything is a URL, and more", on Linux,
+macOS, Windows, and more.
 
-```rust
-#[derive(Clap)]
-#[clap(about = "A simple filter program with input and output")]
-struct Opt {
-    /// Input source
-    input: InputByteStream,
-
-    /// Output sink
-    output: OutputByteStream,
-}
-
-fn main() {
-    let mut opt = Opt::from_args();
-
-    // ... use `opt.input` and `opt.output`.
-}
-```
-
-In both examples, the underlying command-line argument strings are hidden
-from the main program. Command-line usage for both examples looks like this:
+`kommand::main` parses the documentation comment to extract the program
+description and the arguments. The command-line usage for the example above
+looks like this:
 
 ```
 $ cargo run -- --help
 simple-filter 0.0.0
-A simple filter program with input and output
+A simple program with input and output
 
 USAGE:
     simple-filter <input> <output>
@@ -114,27 +63,27 @@ ARGS:
     <output>    Output sink
 ```
 
-The arguments can then be a variety of kinds, including URLs and files:
-```
-$ cargo run -- https://example.com out.txt
-```
+## What's inside
 
-With either [`clap_derive`] or [`kommand`], command-line arguments can
-use any type which implements `FromStr`, including builtin types like `i32` or `bool`
-or library types like [`Regex`] or [`Duration`]. See [the examples directory] for
-more examples.
+This library provides:
 
-[`InputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html
-[`OutputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.OutputByteStream.html
-[`InputTextStream`]: https://docs.rs/nameless/latest/nameless/struct.InputTextStream.html
-[`OutputTextStream`]: https://docs.rs/nameless/latest/nameless/struct.OutputTextStream.html
-[`InteractiveByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InteractiveByteStream.html
-[`BufInteractor`]: https://docs.rs/nameless/latest/nameless/struct.BufInteractor.html
-[`BufReaderLineWriter`]: https://docs.rs/nameless/latest/nameless/struct.BufReaderLineWriter.html
-[`ReadWrite`]: https://docs.rs/nameless/latest/nameless/trait.ReadWrite.html
-[`Regex`]: https://docs.rs/regex/latest/regex/struct.Regex.html
-[`Duration`]: https://docs.rs/humantime/latest/humantime/struct.Duration.html
-[the examples directory]: examples
+ - New stream types, [`InputByteStream`], [`OutputByteStream`], and
+   [`InteractiveByteStream`] for working with byte streams, and
+   [`InputTextStream`], [`OutputTextStream`], and [`InteractiveTextStream`]
+   for working with text streams. These implement [`Read`] and [`Write`] in
+   the usual way, so they interoperate with existing Rust code.
+
+   You can use all these types in type-aware command-line parsing packages
+   such as [`nameless-clap_derive`] or this library's own [`kommand`].
+   (`nameless-clap_derive` is a temporary fork of [`clap_derive`]; we are
+   in the process of upstreaming our patches).
+
+ - A new command-line parsing package, [`kommand`], which is similar to
+   to [`paw`], but uses function argument syntax instead of having an options
+   struct. Command-line arguments can use any type which implements the standard
+   `FromStr` trait, including builtin types like `i32` or `bool` or library
+   types like [`Regex`] or [`Duration`]. See [the examples directory] for
+   more examples.
 
 ## Data URLs
 
@@ -143,10 +92,38 @@ mention. They carry a payload string in the URL itself which produced as the
 input stream. For example, opening `data:,Hello%2C%20World!` produces an
 input stream that reads the string "Hello, World!". Payloads can also be
 base64 encoded, like this: `data:text/plain;base64,SGVsbG8sIFdvcmxkIQ==`.
-So you can pass a literal string directly into a program instead of creating
-a temporary file.
+So you can pass a literal string directly into a program's input stream
+instead of creating a temporary file.
 
-[`data:` URLs]: https://fetch.spec.whatwg.org/#data-urls
+## Why "nameless"?
+
+It refers to how, from the program's perspective, the string names of the
+inputs and outputs are hidden by the library.
+
+Of course, sometimes you do want to know the name of an input, such as to
+display it in an error message. Nameless's [`pseudonym`] mechanism provides
+names for [`InputByteStream`] and other stream types, which allow the name
+to be displayed without exposing it to the application.
+
+And sometimes you want to know an input file's extension, to determine what
+type of input it is. [`InputByteStream`] and other stream types have a
+[`type_`] function which returns the [media type] (aka MIME type). If the
+input is a file, the type is inferred from the extension; if it's an HTTP
+stream, the type is inferred from the `Content-Type` header, and so on.
+
+Why is it important to hide the name? On a theoretical level, most
+computations shouldn't care about where data is coming from or where it's
+going. This helps separate the concerns of what the program primarily does
+and how the program interacts with the local organization of resources.
+On a practical level, this is what makes it possible for nameless to
+transparently support URLs, child processes, and other things. And, it will
+support applications which are useful on conventional platforms, but which
+also work on platforms that lack filesystems, such as embedded systems or
+systems with new kinds of storage abstractions.
+
+Hiding the names also helps programs avoid accidentally having behavior that
+depends on the names of files it accesses, which is a common source of trouble
+in deterministic-build environments.
 
 ## Literary reference
 
@@ -154,3 +131,24 @@ a temporary file.
 > have no names.’
 
 — <cite>"Through the Looking Glass", by Lewis Carroll</cite>
+
+[conventional]: https://doc.rust-lang.org/stable/rust-by-example/meta/doc.html
+[`nameless-clap_derive`]: https://crates.io/crates/nameless-clap_derive
+[`clap_derive`]: https://crates.io/crates/clap_derive
+[`paw`]: https://crates.io/crates/paw
+[`kommand`]: https://crates.io/crates/kommand
+[`Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
+[`Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
+[`InputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html
+[`OutputByteStream`]: https://docs.rs/nameless/latest/nameless/struct.OutputByteStream.html
+[`InteractiveByteStream`]: https://docs.rs/nameless/latest/nameless/struct.InteractiveByteStream.html
+[`InputTextStream`]: https://docs.rs/nameless/latest/nameless/struct.InputTextStream.html
+[`OutputTextStream`]: https://docs.rs/nameless/latest/nameless/struct.OutputTextStream.html
+[`InteractiveTextStream`]: https://docs.rs/nameless/latest/nameless/struct.InteractiveTextStream.html
+[`Regex`]: https://docs.rs/regex/latest/regex/struct.Regex.html
+[`Duration`]: https://docs.rs/humantime/latest/humantime/struct.Duration.html
+[the examples directory]: examples
+[`data:` URLs]: https://fetch.spec.whatwg.org/#data-urls
+[`pseudonym`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html#method.pseudonym
+[media type]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types
+[`type_`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html#method.type_

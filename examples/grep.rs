@@ -21,8 +21,7 @@ fn main(
 
     for input in inputs {
         let pseudonym = input.pseudonym();
-        let reader = BufReader::new(input);
-        for line in reader.lines() {
+        for line in BufReader::new(input).lines() {
             let line = line?;
             if pattern.is_match(&line) {
                 if print_inputs {
