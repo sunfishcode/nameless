@@ -18,6 +18,7 @@ use std::{
     process::{exit, Child},
 };
 use terminal_io::{Terminal, TerminalColorSupport, TerminalWriter, WriteTerminal};
+#[cfg(not(windows))]
 use unsafe_io::AsUnsafeHandle;
 use utf8_io::{Utf8Writer, WriteStr};
 
