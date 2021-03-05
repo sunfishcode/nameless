@@ -21,8 +21,8 @@ data-url = "0.1.0"
 duplex = { version = "0.3.0", features = ["ssh2"] }
 flate2 = "1.0.19"
 layered-io = { version = "0.4.0", features = ["terminal-io"] }
-io-streams = { version = "0.2.3", features = ["layered-io", "terminal-io", "use-char-device", "use-socketpair"] }
-io-arrays = "0.2.2"
+io-streams = { version = "0.3.0", features = ["layered-io", "terminal-io", "use_char_device", "use_socketpair"] }
+io-arrays = "0.3.0"
 libc = "0.2.87"
 mime = "0.3.16"
 mime_guess = "2.0.3"
