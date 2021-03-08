@@ -98,8 +98,8 @@ instead of creating a temporary file.
 
 ## Why "nameless"?
 
-It refers to how, from the program's perspective, the string names of the
-inputs and outputs are hidden by the library.
+The name "nameless" refers to how, from the program's perspective, the string
+names of the inputs and outputs are hidden by the library.
 
 Of course, sometimes you do want to know the name of an input, such as to
 display it in an error message. Nameless's [`pseudonym`] mechanism provides
