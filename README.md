@@ -17,14 +17,6 @@ Nameless provides full-service command-line parsing. This means you just write
 a `main` function with arguments with the types you want, add a [conventional]
 documentation comment, and it takes care of the rest:
 
-Cargo.toml:
-```toml
-[dependencies]
-kommand = "0"
-nameless = "0"
-clap = { version = "3.0.0-beta.2", package = "nameless-clap" }
-```
-
 Rust code:
 ```rust
 use nameless::{InputByteStream, OutputByteStream};
@@ -42,6 +34,14 @@ fn main(mut input: InputByteStream, mut output: OutputByteStream) -> io::Result<
     input.read_to_string(&mut s)?;
     output.write_all(s.as_bytes())
 }
+```
+
+Cargo.toml:
+```toml
+[dependencies]
+kommand = "0"
+nameless = "0"
+clap = { version = "3.0.0-beta.2", package = "nameless-clap" }
 ```
 
 Nameless completely handles "string to stream" translation. And in doing so, it
