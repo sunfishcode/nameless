@@ -109,16 +109,6 @@ This library provides:
    types like [`Regex`] or [`Duration`]. See [the examples directory] for
    more examples.
 
-## Data URLs
-
-[`data:` URLs] aren't as widely known, but are cool and deserve special
-mention. They carry a payload string in the URL itself which produced as the
-input stream. For example, opening `data:,Hello%2C%20World!` produces an
-input stream that reads the string "Hello, World!". Payloads can also be
-base64 encoded, like this: `data:text/plain;base64,SGVsbG8sIFdvcmxkIQ==`.
-So you can pass a literal string directly into a program's input stream
-instead of creating a temporary file.
-
 ## Why "nameless"?
 
 The name "nameless" refers to how, from the program's perspective, the string
@@ -148,6 +138,16 @@ systems with new kinds of storage abstractions.
 Hiding the names also helps programs avoid accidentally having behavior that
 depends on the names of files it accesses, which is a common source of trouble
 in deterministic-build environments.
+
+## Data URLs
+
+[`data:` URLs] aren't as widely known, but are cool and deserve special
+mention. They carry a payload string in the URL itself which produced as the
+input stream. For example, opening `data:,Hello%2C%20World!` produces an
+input stream that reads the string "Hello, World!". Payloads can also be
+base64 encoded, like this: `data:text/plain;base64,SGVsbG8sIFdvcmxkIQ==`.
+So you can pass a literal string directly into a program's input stream
+instead of creating a temporary file.
 
 ## Looking forward
 
