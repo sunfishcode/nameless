@@ -82,8 +82,11 @@ ARGS:
 
 To add a flag, for example, `#[kommand(short = 'n', long)] number: u32` means
 an argument with type `i32` which can be specified with `-n` or `--number` on
-the command line. See the [clap-v3 documentation] for more documentation on
-available options.
+the command line. The [grep example] shows an example of this.
+
+[grep example]: https://github.com/sunfishcode/nameless/blob/main/examples/grep.rs
+
+The [clap-v3 documentation] for the full list of available features.
 
 [clap-v3 documentation]: https://docs.rs/clap-v3/latest/clap_v3/
 
