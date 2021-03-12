@@ -5,7 +5,7 @@ use proc_macro2::{Literal as Literal2, Span as Span2, TokenTree as TokenTree2};
 use pulldown_cmark::{Event, OffsetIter, Options, Parser, Tag};
 use quote::{quote, quote_spanned};
 use std::ops::{Bound, Range, RangeBounds};
-use syn::{spanned::Spanned, Pat};
+use syn::{spanned::Spanned, Ident, Pat};
 
 #[proc_macro_attribute]
 pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -78,12 +78,6 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
             };
 
-            if !arg.attrs.is_empty() {
-                let tokens = quote_spanned! { inputs.span() =>
-                    compile_error!("Main argument has unsupported attributes");
-                };
-                return TokenStream::from(tokens);
-            }
             if let Pat::Ident(ident) = &*arg.pat {
                 if var_index < var_info.len() && ident.ident.to_string() == var_info[var_index].0 {
                     arg_docs.push(var_info[var_index].1.clone());
@@ -118,6 +112,19 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
             // Create a copy of the argument with the no-`mut` ident.
             let mut no_mut_arg = arg.clone();
             no_mut_arg.pat = Box::new(syn::Pat::Ident(no_mut_ident));
+
+            // If the argument has a "kommand" attribute, convert it into a
+            // "clap" attribute.
+            if !no_mut_arg.attrs.is_empty() {
+                if no_mut_arg.attrs.len() != 1 || !no_mut_arg.attrs[0].path.is_ident("kommand") {
+                    let tokens = quote_spanned! { inputs.span() =>
+                        compile_error!("Main argument has unsupported attributes");
+                    };
+                    return TokenStream::from(tokens);
+                }
+                let ident = &mut no_mut_arg.attrs[0].path.segments.first_mut().unwrap().ident;
+                *ident = Ident::new("clap", ident.span());
+            }
 
             args.push(no_mut_arg);
         }
