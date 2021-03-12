@@ -8,7 +8,6 @@ license = "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
 keywords = ["cli", "file", "network"]
 categories = ["command-line-interface", "filesystem", "network-programming"]
 repository = "https://github.com/sunfishcode/nameless"
-readme = "README.md"
 
 [build-dependencies]
 rustc_version = "0.3.3"
