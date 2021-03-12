@@ -11,6 +11,7 @@
 //!   (`nameless-clap_derive` is a temporary fork of [`clap_derive`]; we are
 //!   in the process of upstreaming our patches).
 //!
+//! [`nameless-clap_derive`]: https://crates.io/crates/nameless-clap_derive
 //! [`clap_derive`]: https://crates.io/crates/clap_derive
 //! [`kommand`]: https://crates.io/crates/kommand
 //! [`Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
