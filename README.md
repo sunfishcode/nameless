@@ -17,6 +17,15 @@ Nameless provides full-service command-line parsing. This means you just write
 a `main` function with arguments with the types you want, add a [conventional]
 documentation comment, and it takes care of the rest:
 
+Cargo.toml:
+```toml
+[dependencies]
+kommand = "0"
+nameless = "0"
+clap = { version = "3.0.0-beta.2", package = "nameless-clap" }
+```
+
+Rust code:
 ```rust
 use nameless::{InputByteStream, OutputByteStream};
 use std::io::{self, Read, Write};
