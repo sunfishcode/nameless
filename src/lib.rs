@@ -29,6 +29,9 @@
 #![cfg_attr(can_vector, feature(can_vector))]
 #![cfg_attr(write_all_vectored, feature(write_all_vectored))]
 
+// Re-export `clap` for use in the proc macros.
+#[doc(hidden)] pub use clap;
+
 pub use mime::Mime;
 
 mod input_byte_stream;
