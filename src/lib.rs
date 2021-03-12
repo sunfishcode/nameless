@@ -30,7 +30,8 @@
 #![cfg_attr(write_all_vectored, feature(write_all_vectored))]
 
 // Re-export `clap` for use in the proc macros.
-#[doc(hidden)] pub use clap;
+#[doc(hidden)]
+pub use clap;
 
 pub use mime::Mime;
 
