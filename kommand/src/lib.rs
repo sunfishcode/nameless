@@ -242,9 +242,9 @@ fn parse_arguments_list(
     while let Some((Event::Start(Tag::Item), _)) = p.next() {
         if let Some((Event::Code(var_name), _)) = p.next() {
             if let Some((Event::Text(var_description), _)) = p.next() {
-                if let Some(parsed_description) = var_description.strip_prefix(" - ") {
+                if let Some(parsed_description) = var_description.trim().strip_prefix("-") {
                     // We've parsed a row of the list. Record it.
-                    var_info.push((var_name.to_string(), parsed_description.to_string()));
+                    var_info.push((var_name.to_string(), parsed_description.trim().to_string()));
 
                     if matches!(p.next(), Some((Event::End(Tag::Item), _))) {
                         // If we make it to the end of the item successfully,

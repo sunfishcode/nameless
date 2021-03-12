@@ -50,8 +50,8 @@ stdin/stdout (`-`), child processes (`$(...)`) (not yet on Windows tho), and
 URLs, including `http:`, `https:`, `scp:` (enable the "ssh2" feature), `file:`,
 and `data:`. And on output, nameless automatically takes care of piping data
 through [`bat`](https://crates.io/crates/bat) for syntax highlighting and
-paging. So while your code is busy doing one thing and doing it well,
-nameless takes care of streaming the data in and out.
+paging. So while your code is busy doing one thing and doing it well, nameless
+takes care of streaming the data in and out.
 
 "Everything is a URL, and more", on Linux, macOS, Windows, and more.
 
@@ -82,13 +82,9 @@ ARGS:
 
 To add a flag, for example, `#[kommand(short = 'n', long)] number: u32` means
 an argument with type `i32` which can be specified with `-n` or `--number` on
-the command line. The [grep example] shows an example of this.
-
-[grep example]: https://github.com/sunfishcode/nameless/blob/main/examples/grep.rs
+the command line. The [grep example] and [basic example] show examples of this.
 
 The [clap-v3 documentation] for the full list of available features.
-
-[clap-v3 documentation]: https://docs.rs/clap-v3/latest/clap_v3/
 
 ## What's inside
 
@@ -165,6 +161,9 @@ Nameless is actively evolving! Watch this space for much more to come, and
 — <cite>"Through the Looking Glass", by Lewis Carroll</cite>
 
 [conventional]: https://doc.rust-lang.org/stable/rust-by-example/meta/doc.html
+[basic example]: https://github.com/sunfishcode/nameless/blob/main/examples/basic.rs
+[grep example]: https://github.com/sunfishcode/nameless/blob/main/examples/grep.rs
+[clap-v3 documentation]: https://docs.rs/clap-v3/latest/clap_v3/
 [`nameless-clap_derive`]: https://crates.io/crates/nameless-clap_derive
 [`clap_derive`]: https://crates.io/crates/clap_derive
 [`paw`]: https://crates.io/crates/paw
