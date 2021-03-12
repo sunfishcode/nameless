@@ -45,11 +45,14 @@ fn main(mut input: InputByteStream, mut output: OutputByteStream) -> io::Result<
 ```
 
 Nameless completely handles "string to stream" translation. And in doing so, it
-doesn't just support files, but also gzipped files (`\*.gz`),
+doesn't just support files, but also gzipped files (`*.gz`),
 stdin/stdout (`-`), child processes (`$(...)`) (not yet on Windows tho), and
 URLs, including `http:`, `https:`, `scp:` (enable the "ssh2" feature), `file:`,
-and `data:`. So while your code is busy doing one thing and doing it well,
+and `data:`. And on output, nameless automatically takes care of piping data
+through [`bat`](https://crates.io/crates/bat) for syntax highlighting and
+paging. So while your code is busy doing one thing and doing it well,
 nameless takes care of streaming the data in and out.
+
 "Everything is a URL, and more", on Linux, macOS, Windows, and more.
 
 `kommand::main` parses the documentation comment to extract the program
