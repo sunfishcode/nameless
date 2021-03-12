@@ -50,7 +50,6 @@ kommand = { path = "kommand" }
 reaktor = { path = "reaktor" }
 regex = "1.4.2"
 itertools = "0.10.0"
-clap = { version = "3.0.0-beta.2", package = "nameless-clap" }
 clap_derive = { version = "3.0.0-beta.2", package = "nameless-clap_derive" }
 
 [badges]
