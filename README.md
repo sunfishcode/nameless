@@ -64,6 +64,17 @@ ARGS:
     <output>    Output sink
 ```
 
+## More features
+
+`kommand` is a wrapper around `clap_derive`, and supports the same attributes.
+
+To add a flag, for example, `#[kommand(short = 'n', long)] number: u32` means
+an argument with type `i32` which can be specified with `-n` or `--number` on
+the command line. See the [clap-v3 documentation] for more documentation on
+available options.
+
+[clap-v3 documentation]: https://docs.rs/clap-v3/latest/clap_v3/
+
 ## What's inside
 
 This library provides:
