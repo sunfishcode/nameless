@@ -21,24 +21,16 @@ use nameless::{InputByteStream, OutputByteStream};
 /// * `inputs`  - inputs to process
 #[kommand::main]
 fn main(
-    // A flag, true if used in the command line. Note doc comment will
-    // be used for the help message of the flag. The name of the
-    // argument will be, by default, based on the name of the field.
+    // A flag, true if used in the command line. The name of the argument will be,
+    // by default, based on the name of the field.
     #[kommand(short, long)] debug: bool,
-
     // The number of occurrences of the `v/verbose` flag
     #[kommand(short, long, parse(from_occurrences))] verbose: u8,
-
     #[kommand(short, long, default_value = "42")] speed: f64,
-
     #[kommand(short, long)] output: OutputByteStream,
-
-    // the long option will be translated by default to kebab case,
-    // i.e. `--nb-cars`.
+    // the long option will be translated by default to kebab case, i.e. `--nb-cars`.
     #[kommand(short = 'c', long)] nb_cars: Option<i32>,
-
     #[kommand(short, long)] level: Vec<String>,
-
     #[kommand(name = "INPUT")] inputs: Vec<InputByteStream>,
 ) {
     dbg!(debug, verbose, speed, output, nb_cars, level, inputs);
