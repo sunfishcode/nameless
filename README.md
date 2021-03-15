@@ -41,7 +41,6 @@ Cargo.toml:
 [dependencies]
 kommand = "0"
 nameless = "0"
-clap = { version = "3.0.0-beta.2", package = "nameless-clap" }
 ```
 
 Nameless completely handles "string to stream" translation. And in doing so, it

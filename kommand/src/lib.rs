@@ -128,7 +128,14 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
             args.push(no_mut_arg);
         }
+
+        // Import `nameless::clap` so that clap_derive's macro expansions can
+        // use it, and our users don't need to manually import it. In theory
+        // there are cleaner ways to do this, but as a macro-around-a-macro,
+        // we don't have that much flexibility.
         quote! {
+            use nameless::clap;
+
             #[derive(clap::Clap)]
             #[clap(#(about=#abouts)*)]
             struct _KommandOpt {
