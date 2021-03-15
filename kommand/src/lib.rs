@@ -10,7 +10,6 @@ use syn::{spanned::Spanned, Ident, Pat};
 #[proc_macro_attribute]
 pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
-
     let ret = &input.sig.output;
     let name = &input.sig.ident;
     let body = &input.block;
@@ -18,10 +17,9 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let attrs = &input.attrs;
 
     if name != "main" {
-        let tokens = quote_spanned! { name.span() =>
+        return TokenStream::from(quote_spanned! { name.span() =>
             compile_error!("only `main` can be tagged with `#[kommand::main]`");
-        };
-        return TokenStream::from(tokens);
+        });
     }
 
     // Convert the function's documentation comment into an `about` attribute
@@ -52,6 +50,7 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
 
+    // Parse the `Arguments` information from the comment.
     let (edited, var_info) = match parse_comment(&about, name.span()) {
         Ok(var_info) => var_info,
         Err(tokenstream) => return tokenstream,
@@ -60,106 +59,98 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
         abouts.push(edited);
     }
 
-    let mut var_index = 0;
+    // Process the function arguments.
     let inputs = &input.sig.inputs;
-    let result = {
-        let mut args = Vec::new();
-        let mut arg_docs = Vec::new();
-        let mut arg_names = Vec::new();
-        let mut arg_types = Vec::new();
-        for input in inputs {
-            let arg = match input {
-                syn::FnArg::Typed(arg) => arg,
-                syn::FnArg::Receiver(_) => {
-                    let tokens = quote_spanned! { inputs.span() =>
-                        compile_error!("fn main shouldn't take a self argument");
-                    };
-                    return TokenStream::from(tokens);
-                }
-            };
-
-            if let Pat::Ident(ident) = &*arg.pat {
-                if var_index < var_info.len() && ident.ident.to_string() == var_info[var_index].0 {
-                    arg_docs.push(var_info[var_index].1.clone());
-                    var_index += 1;
-                } else {
-                    // Skip uncommented arguments.
-                    arg_docs.push(String::new());
-                }
-            } else {
-                let tokens = quote_spanned! { inputs.span() =>
-                    compile_error!("`main` argument does not have a plain identifier");
-                };
-                return TokenStream::from(tokens);
+    let mut var_index = 0;
+    let mut args = Vec::new();
+    let mut arg_docs = Vec::new();
+    let mut arg_names = Vec::new();
+    let mut arg_types = Vec::new();
+    for input in inputs {
+        let arg = match input {
+            syn::FnArg::Typed(arg) => arg,
+            syn::FnArg::Receiver(_) => {
+                return TokenStream::from(quote_spanned! { inputs.span() =>
+                    compile_error!("fn main shouldn't take a self argument");
+                });
             }
-
-            arg_names.push(arg.pat.clone());
-            arg_types.push(arg.ty.clone());
-
-            // Create a copy of the ident with the leading `mut` removed,
-            // if applicable.
-            let mut no_mut_ident = match &*arg.pat {
-                syn::Pat::Ident(ident) => ident.clone(),
-                _ => {
-                    let tokens = quote_spanned! { inputs.span() =>
-                        compile_error!("fn main should take normal named arguments");
-                    };
-                    return TokenStream::from(tokens);
-                }
-            };
-            no_mut_ident.mutability = None;
-
-            // Create a copy of the argument with the no-`mut` ident.
-            let mut no_mut_arg = arg.clone();
-            no_mut_arg.pat = Box::new(syn::Pat::Ident(no_mut_ident));
-
-            // If the argument has a "kommand" attribute, convert it into a
-            // "clap" attribute.
-            if !no_mut_arg.attrs.is_empty() {
-                if no_mut_arg.attrs.len() != 1 || !no_mut_arg.attrs[0].path.is_ident("kommand") {
-                    let tokens = quote_spanned! { inputs.span() =>
-                        compile_error!("Main argument has unsupported attributes");
-                    };
-                    return TokenStream::from(tokens);
-                }
-                let ident = &mut no_mut_arg.attrs[0].path.segments.first_mut().unwrap().ident;
-                *ident = Ident::new("clap", ident.span());
-            }
-
-            args.push(no_mut_arg);
-        }
-
-        // Import `nameless::clap` so that clap_derive's macro expansions can
-        // use it, and our users don't need to manually import it. In theory
-        // there are cleaner ways to do this, but as a macro-around-a-macro,
-        // we don't have that much flexibility.
-        quote! {
-            use nameless::clap;
-
-            #[derive(clap::Clap)]
-            #[clap(#(about=#abouts)*)]
-            struct _KommandOpt {
-                #(#[doc = #arg_docs] #args,)*
-            }
-
-            #(#attrs)*
-            #asyncness fn main() #ret {
-                let _KommandOpt { #(#arg_names,)* } = clap::Clap::parse();
-
-                #body
-            }
-
-        }
-    };
-
-    if var_index != var_info.len() {
-        let tokens = quote_spanned! { inputs.span() =>
-            compile_error!("Documentation comment lists more arguments than are present in `main`");
         };
-        return TokenStream::from(tokens);
+
+        if let Pat::Ident(ident) = &*arg.pat {
+            if var_index < var_info.len() && ident.ident.to_string() == var_info[var_index].0 {
+                arg_docs.push(var_info[var_index].1.clone());
+                var_index += 1;
+            } else {
+                // Skip uncommented arguments.
+                arg_docs.push(String::new());
+            }
+        } else {
+            return TokenStream::from(quote_spanned! { inputs.span() =>
+                compile_error!("`main` argument does not have a plain identifier");
+            });
+        }
+
+        arg_names.push(arg.pat.clone());
+        arg_types.push(arg.ty.clone());
+
+        // Create a copy of the ident with the leading `mut` removed,
+        // if applicable.
+        let mut no_mut_ident = match &*arg.pat {
+            syn::Pat::Ident(ident) => ident.clone(),
+            _ => {
+                return TokenStream::from(quote_spanned! { inputs.span() =>
+                    compile_error!("fn main should take normal named arguments");
+                });
+            }
+        };
+        no_mut_ident.mutability = None;
+
+        // Create a copy of the argument with the no-`mut` ident.
+        let mut no_mut_arg = arg.clone();
+        no_mut_arg.pat = Box::new(syn::Pat::Ident(no_mut_ident));
+
+        // If the argument has a "kommand" attribute, convert it into a
+        // "clap" attribute.
+        if !no_mut_arg.attrs.is_empty() {
+            if no_mut_arg.attrs.len() != 1 || !no_mut_arg.attrs[0].path.is_ident("kommand") {
+                return TokenStream::from(quote_spanned! { inputs.span() =>
+                    compile_error!("Main argument has unsupported attributes");
+                });
+            }
+            let ident = &mut no_mut_arg.attrs[0].path.segments.first_mut().unwrap().ident;
+            *ident = Ident::new("clap", ident.span());
+        }
+
+        args.push(no_mut_arg);
+    }
+    if var_index != var_info.len() {
+        return TokenStream::from(quote_spanned! { inputs.span() =>
+            compile_error!("Documentation comment lists more arguments than are present in `main`");
+        });
     }
 
-    result.into()
+    // Import `nameless::clap` so that clap_derive's macro expansions can
+    // use it, and our users don't need to manually import it. In theory
+    // there are cleaner ways to do this, but as a macro-around-a-macro,
+    // we don't have that much flexibility.
+    (quote! {
+        use nameless::clap;
+
+        #[derive(clap::Clap)]
+        #[clap(#(about=#abouts)*)]
+        struct _KommandOpt {
+            #(#[doc = #arg_docs] #args,)*
+        }
+
+        #(#attrs)*
+        #asyncness fn main() #ret {
+            let _KommandOpt { #(#arg_names,)* } = clap::Clap::parse();
+
+            #body
+        }
+
+    })
+    .into()
 }
 
 // Convert a `Literal` holding a string literal into the `String`.
@@ -226,10 +217,9 @@ fn parse_comment(about: &str, span: Span2) -> Result<(String, Vec<(String, Strin
                 if let Some((Event::Start(Tag::List(None)), _)) = p.next() {
                     return parse_arguments_list(start_offset, p, span, about);
                 }
-                let tokens = quote_spanned! { span =>
+                return Err(TokenStream::from(quote_spanned! { span =>
                     compile_error!("`# Arguments` section does not contain a name/description list");
-                };
-                return Err(TokenStream::from(tokens));
+                }));
             }
         }
     }
@@ -259,17 +249,15 @@ fn parse_arguments_list(
                         continue;
                     }
                 } else {
-                    let tokens = quote_spanned! { span =>
+                    return Err(TokenStream::from(quote_spanned! { span =>
                         compile_error!("Argument description must start with ` - `");
-                    };
-                    return Err(TokenStream::from(tokens));
+                    }));
                 }
             }
         }
-        let tokens = quote_spanned! { span =>
+        return Err(TokenStream::from(quote_spanned! { span =>
             compile_error!("Name/description list has unexpected contents");
-        };
-        return Err(TokenStream::from(tokens));
+        }));
     }
 
     // We've successfully reached the end of the list.
