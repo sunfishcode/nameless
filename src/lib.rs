@@ -40,6 +40,7 @@ mod input_text_stream;
 mod interactive_byte_stream;
 mod interactive_text_stream;
 mod lazy_output;
+mod media_type;
 mod open_input;
 mod open_interactive;
 mod open_output;
@@ -49,14 +50,13 @@ mod path_to_name;
 mod pseudonym;
 #[cfg(unix)]
 mod summon_bat;
-mod r#type;
 
 pub use input_byte_stream::InputByteStream;
 pub use input_text_stream::InputTextStream;
 pub use interactive_byte_stream::InteractiveByteStream;
 pub use interactive_text_stream::InteractiveTextStream;
 pub use lazy_output::LazyOutput;
+pub use media_type::MediaType;
 pub use output_byte_stream::OutputByteStream;
 pub use output_text_stream::OutputTextStream;
 pub use pseudonym::Pseudonym;
-pub use r#type::Type;

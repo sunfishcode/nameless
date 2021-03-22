@@ -1,6 +1,6 @@
 use crate::{
     open_input::{open_input, Input},
-    Pseudonym, Type,
+    MediaType, Pseudonym,
 };
 use clap::TryFromOsArg;
 use io_streams::StreamReader;
@@ -41,7 +41,7 @@ use terminal_io::NeverTerminalReader;
 pub struct InputByteStream {
     name: String,
     reader: LayeredReader<NeverTerminalReader<StreamReader>>,
-    type_: Type,
+    media_type: MediaType,
     initial_size: Option<u64>,
 }
 
@@ -52,8 +52,8 @@ impl InputByteStream {
     /// not on examining any of the contents of the stream, and there's no
     /// guarantee the contents are valid.
     #[inline]
-    pub fn type_(&self) -> &Type {
-        &self.type_
+    pub fn media_type(&self) -> &MediaType {
+        &self.media_type
     }
 
     /// Return the initial size of the stream, in bytes. This is strictly based
@@ -79,7 +79,7 @@ impl InputByteStream {
         Self {
             name: input.name,
             reader,
-            type_: input.type_,
+            media_type: input.media_type,
             initial_size: input.initial_size,
         }
     }
@@ -159,7 +159,7 @@ impl Debug for InputByteStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // Don't print the name here, as that's an implementation detail.
         let mut b = f.debug_struct("InputByteStream");
-        b.field("type_", &self.type_);
+        b.field("media_type", &self.media_type);
         b.field("initial_size", &self.initial_size);
         b.finish()
     }

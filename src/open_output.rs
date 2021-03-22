@@ -1,4 +1,4 @@
-use crate::{path_to_name::path_to_name, Type};
+use crate::{path_to_name::path_to_name, MediaType};
 use anyhow::anyhow;
 use flate2::{write::GzEncoder, Compression};
 use io_streams::StreamWriter;
@@ -8,19 +8,19 @@ use url::Url;
 pub(crate) struct Output {
     pub(crate) name: String,
     pub(crate) writer: StreamWriter,
-    pub(crate) type_: Type,
+    pub(crate) media_type: MediaType,
 }
 
-pub(crate) fn open_output(os: &OsStr, type_: Type) -> anyhow::Result<Output> {
+pub(crate) fn open_output(os: &OsStr, media_type: MediaType) -> anyhow::Result<Output> {
     if let Some(s) = os.to_str() {
         // If we can parse it as a URL, treat it as such.
         if let Ok(url) = Url::parse(s) {
-            return open_url(url, type_);
+            return open_url(url, media_type);
         }
 
         // Special-case "-" to mean stdout.
         if s == "-" {
-            return acquire_stdout(type_);
+            return acquire_stdout(media_type);
         }
     }
 
@@ -30,25 +30,25 @@ pub(crate) fn open_output(os: &OsStr, type_: Type) -> anyhow::Result<Output> {
 
         // Strings beginning with "$(" are commands.
         if lossy.starts_with("$(") {
-            return spawn_child(os, &lossy, type_);
+            return spawn_child(os, &lossy, media_type);
         }
     }
 
     // Otherwise try opening it as a path in the filesystem namespace.
-    open_path(Path::new(os), type_)
+    open_path(Path::new(os), media_type)
 }
 
-fn acquire_stdout(type_: Type) -> anyhow::Result<Output> {
+fn acquire_stdout(media_type: MediaType) -> anyhow::Result<Output> {
     let stdout = StreamWriter::stdout()?;
 
     Ok(Output {
         name: "-".to_string(),
         writer: stdout,
-        type_,
+        media_type,
     })
 }
 
-fn open_url(url: Url, type_: Type) -> anyhow::Result<Output> {
+fn open_url(url: Url, media_type: MediaType) -> anyhow::Result<Output> {
     match url.scheme() {
         // TODO: POST the data to HTTP? But the `Write` trait makes this
         // tricky because there's no hook for closing and finishing the
@@ -69,7 +69,7 @@ fn open_url(url: Url, type_: Type) -> anyhow::Result<Output> {
             open_path(
                 &url.to_file_path()
                     .map_err(|_: ()| anyhow!("unknown file URL weirdness"))?,
-                type_,
+                media_type,
             )
         }
         "data" => Err(anyhow!("output to data URL isn't possible")),
@@ -77,34 +77,34 @@ fn open_url(url: Url, type_: Type) -> anyhow::Result<Output> {
     }
 }
 
-fn open_path(path: &Path, type_: Type) -> anyhow::Result<Output> {
+fn open_path(path: &Path, media_type: MediaType) -> anyhow::Result<Output> {
     let name = path_to_name("file", path)?;
     let file = File::create(path).map_err(|err| anyhow!("{}: {}", path.display(), err))?;
     if path.extension() == Some(Path::new("gz").as_os_str()) {
         // TODO: We shouldn't really need to allocate a `PathBuf` here.
         let path = path.with_extension("");
-        let type_ = Type::merge(type_, Type::from_extension(path.extension()));
+        let media_type = MediaType::union(media_type, MediaType::from_extension(path.extension()));
         // 6 is the default gzip compression level.
         let writer =
             StreamWriter::piped_thread(Box::new(GzEncoder::new(file, Compression::new(6))))?;
         Ok(Output {
             name,
             writer,
-            type_,
+            media_type,
         })
     } else {
-        let type_ = Type::merge(type_, Type::from_extension(path.extension()));
+        let media_type = MediaType::union(media_type, MediaType::from_extension(path.extension()));
         let writer = StreamWriter::file(file);
         Ok(Output {
             name,
             writer,
-            type_,
+            media_type,
         })
     }
 }
 
 #[cfg(not(windows))]
-fn spawn_child(os: &OsStr, lossy: &str, type_: Type) -> anyhow::Result<Output> {
+fn spawn_child(os: &OsStr, lossy: &str, media_type: MediaType) -> anyhow::Result<Output> {
     use std::process::{Command, Stdio};
     assert!(lossy.starts_with("$("));
     if !lossy.ends_with(')') {
@@ -128,6 +128,6 @@ fn spawn_child(os: &OsStr, lossy: &str, type_: Type) -> anyhow::Result<Output> {
     Ok(Output {
         name: lossy.to_owned(),
         writer,
-        type_,
+        media_type,
     })
 }

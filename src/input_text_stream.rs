@@ -1,6 +1,6 @@
 use crate::{
     open_input::{open_input, Input},
-    Pseudonym, Type,
+    MediaType, Pseudonym,
 };
 use basic_text::{ReadText, ReadTextLayered, TextReader, TextStr};
 use clap::TryFromOsArg;
@@ -43,7 +43,7 @@ use utf8_io::{ReadStr, ReadStrLayered, Utf8Reader};
 pub struct InputTextStream {
     name: String,
     reader: TextReader<Utf8Reader<LayeredReader<TerminalReader<StreamReader>>>>,
-    type_: Type,
+    media_type: MediaType,
     initial_size: Option<u64>,
 }
 
@@ -53,8 +53,8 @@ impl InputTextStream {
     /// though some do not. This is strictly based on available metadata, and
     /// not on examining any of the contents of the stream, and there's no
     /// guarantee the contents are valid.
-    pub fn type_(&self) -> &Type {
-        &self.type_
+    pub fn media_type(&self) -> &MediaType {
+        &self.media_type
     }
 
     /// Return the initial size of the stream, in bytes. This is strictly based
@@ -78,11 +78,11 @@ impl InputTextStream {
         let reader = LayeredReader::new(reader);
         let reader = Utf8Reader::new(reader);
         let reader = TextReader::new(reader);
-        let type_ = input.type_.merge(Type::text());
+        let media_type = input.media_type.union(MediaType::text());
         Self {
             name: input.name,
             reader,
-            type_,
+            media_type,
             initial_size: input.initial_size,
         }
     }
@@ -200,7 +200,7 @@ impl Debug for InputTextStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // Don't print the name here, as that's an implementation detail.
         let mut b = f.debug_struct("InputTextStream");
-        b.field("type_", &self.type_);
+        b.field("media_type", &self.media_type);
         b.field("initial_size", &self.initial_size);
         b.finish()
     }

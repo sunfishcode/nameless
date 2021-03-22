@@ -1,7 +1,7 @@
 use crate::{
     lazy_output::FromLazyOutput,
     open_output::{open_output, Output},
-    Pseudonym, Type,
+    MediaType, Pseudonym,
 };
 use anyhow::anyhow;
 use clap::TryFromOsArg;
@@ -43,7 +43,7 @@ use terminal_io::{NeverTerminalWriter, TerminalWriter, WriteTerminal};
 pub struct OutputByteStream {
     name: String,
     writer: LayeredWriter<NeverTerminalWriter<StreamWriter>>,
-    type_: Type,
+    media_type: MediaType,
 }
 
 impl OutputByteStream {
@@ -65,8 +65,8 @@ impl OutputByteStream {
     /// known as MIME type, return it. Some output streams know their type,
     /// though many do not.
     #[inline]
-    pub fn type_(&self) -> &Type {
-        &self.type_
+    pub fn media_type(&self) -> &MediaType {
+        &self.media_type
     }
 
     fn from_output(output: Output) -> anyhow::Result<Self> {
@@ -82,7 +82,7 @@ impl OutputByteStream {
         Ok(Self {
             name: output.name,
             writer,
-            type_: output.type_,
+            media_type: output.media_type,
         })
     }
 }
@@ -98,7 +98,7 @@ impl TryFromOsArg for OutputByteStream {
 
     #[inline]
     fn try_from_os_str_arg(os: &OsStr) -> anyhow::Result<Self> {
-        open_output(os, Type::unknown()).and_then(Self::from_output)
+        open_output(os, MediaType::unknown()).and_then(Self::from_output)
     }
 }
 
@@ -158,8 +158,8 @@ impl Bufferable for OutputByteStream {
 impl FromLazyOutput for OutputByteStream {
     type Err = anyhow::Error;
 
-    fn from_lazy_output(name: OsString, type_: Type) -> Result<Self, anyhow::Error> {
-        open_output(&name, type_).and_then(Self::from_output)
+    fn from_lazy_output(name: OsString, media_type: MediaType) -> Result<Self, anyhow::Error> {
+        open_output(&name, media_type).and_then(Self::from_output)
     }
 }
 
@@ -167,7 +167,7 @@ impl Debug for OutputByteStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // Don't print the name here, as that's an implementation detail.
         let mut b = f.debug_struct("OutputByteStream");
-        b.field("type_", &self.type_);
+        b.field("media_type", &self.media_type);
         b.finish()
     }
 }

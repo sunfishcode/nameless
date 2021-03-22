@@ -1,4 +1,4 @@
-use crate::Type;
+use crate::MediaType;
 use clap::TryFromOsArg;
 use std::{
     error::Error,
@@ -23,7 +23,7 @@ impl fmt::Display for Never {
 pub trait FromLazyOutput {
     type Err;
 
-    fn from_lazy_output(name: OsString, type_: Type) -> Result<Self, Self::Err>
+    fn from_lazy_output(name: OsString, media_type: MediaType) -> Result<Self, Self::Err>
     where
         Self: Sized;
 }
@@ -38,8 +38,8 @@ pub struct LazyOutput<T: FromLazyOutput> {
 impl<T: FromLazyOutput> LazyOutput<T> {
     /// Consume `self` and materialize an output stream.
     #[inline]
-    pub fn materialize(self, type_: Type) -> Result<T, T::Err> {
-        T::from_lazy_output(self.name, type_)
+    pub fn materialize(self, media_type: MediaType) -> Result<T, T::Err> {
+        T::from_lazy_output(self.name, media_type)
     }
 }
 

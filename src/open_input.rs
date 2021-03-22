@@ -1,4 +1,4 @@
-use crate::{path_to_name::path_to_name, Mime, Type};
+use crate::{path_to_name::path_to_name, MediaType, Mime};
 use anyhow::anyhow;
 use data_url::DataUrl;
 use flate2::read::GzDecoder;
@@ -11,7 +11,7 @@ use {percent_encoding::percent_decode, ssh2::Session, std::net::TcpStream};
 pub(crate) struct Input {
     pub(crate) name: String,
     pub(crate) reader: StreamReader,
-    pub(crate) type_: Type,
+    pub(crate) media_type: MediaType,
     pub(crate) initial_size: Option<u64>,
 }
 
@@ -47,7 +47,7 @@ fn acquire_stdin() -> anyhow::Result<Input> {
     Ok(Input {
         name: "-".to_owned(),
         reader,
-        type_: Type::unknown(),
+        media_type: MediaType::unknown(),
         initial_size: None,
     })
 }
@@ -91,14 +91,14 @@ fn open_http_url_str(http_url_str: &str) -> anyhow::Result<Input> {
             .ok_or_else(|| anyhow!("invalid Content-Length header"))?
             .parse()?,
     );
-    let content_type = response.content_type();
-    let type_ = Type::from_mime(Mime::from_str(content_type)?);
+    let media_type = response.content_type();
+    let media_type = MediaType::from_mime(Mime::from_str(media_type)?);
 
     let reader = response.into_reader();
     let reader = StreamReader::piped_thread(Box::new(reader))?;
     Ok(Input {
         name: http_url_str.to_owned(),
-        type_,
+        media_type,
         reader,
         initial_size,
     })
@@ -119,13 +119,14 @@ fn open_data_url_str(data_url_str: &str) -> anyhow::Result<Input> {
 
     // Awkwardly convert from `data_url::Mime` to `mime::Mime`.
     // TODO: Consider submitting patches to `data_url` to streamline this.
-    let type_ = Type::from_mime(Mime::from_str(&data_url.mime_type().to_string()).unwrap());
+    let media_type =
+        MediaType::from_mime(Mime::from_str(&data_url.mime_type().to_string()).unwrap());
 
     let reader = StreamReader::bytes(&body)?;
     Ok(Input {
         name: data_url_str.to_owned(),
         reader,
-        type_,
+        media_type,
         initial_size: Some(data_url_str.len().try_into().unwrap()),
     })
 }
@@ -169,11 +170,11 @@ fn open_scp_url(scp_url: &Url) -> anyhow::Result<Input> {
     let path = Path::new(scp_url.path());
     let (channel, stat) = sess.scp_recv(path)?;
     let reader = StreamReader::piped_thread(Box::new(channel))?;
-    let type_ = Type::from_extension(path.extension());
+    let media_type = MediaType::from_extension(path.extension());
     Ok(Input {
         name: scp_url.as_str().to_owned(),
         reader,
-        type_,
+        media_type,
         initial_size: Some(stat.size()),
     })
 }
@@ -185,24 +186,24 @@ fn open_path(path: &Path) -> anyhow::Result<Input> {
     if path.extension() == Some(Path::new("gz").as_os_str()) {
         // TODO: We shouldn't really need to allocate a `PathBuf` here.
         let path = path.with_extension("");
-        let type_ = Type::from_extension(path.extension());
+        let media_type = MediaType::from_extension(path.extension());
         let initial_size = None;
         let reader = GzDecoder::new(file);
         let reader = StreamReader::piped_thread(Box::new(reader))?;
         Ok(Input {
             name,
             reader,
-            type_,
+            media_type,
             initial_size,
         })
     } else {
-        let type_ = Type::from_extension(path.extension());
+        let media_type = MediaType::from_extension(path.extension());
         let initial_size = Some(file.metadata()?.len());
         let reader = StreamReader::file(file);
         Ok(Input {
             name,
             reader,
-            type_,
+            media_type,
             initial_size,
         })
     }
@@ -233,7 +234,7 @@ fn spawn_child(os: &OsStr, lossy: &str) -> anyhow::Result<Input> {
     Ok(Input {
         name: s.to_owned(),
         reader,
-        type_: Type::unknown(),
+        media_type: MediaType::unknown(),
         initial_size: None,
     })
 }

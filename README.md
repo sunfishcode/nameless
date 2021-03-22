@@ -119,7 +119,7 @@ to be displayed without exposing it to the application.
 
 And sometimes you want to know an input file's extension, to determine what
 type of input it is. [`InputByteStream`] and other stream types have a
-[`type_`] function which returns the [media type] (aka MIME type). If the
+[`media_type`] function which returns the [media type] (aka MIME type). If the
 input is a file, the type is inferred from the extension; if it's an HTTP
 stream, the type is inferred from the `Content-Type` header, and so on.
 
@@ -181,5 +181,5 @@ Nameless is actively evolving! Watch this space for much more to come, and
 [`data:` URLs]: https://fetch.spec.whatwg.org/#data-urls
 [`pseudonym`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html#method.pseudonym
 [media type]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types
-[`type_`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html#method.type_
+[`media_type`]: https://docs.rs/nameless/latest/nameless/struct.InputByteStream.html#method.media_type
 [chat with us in Zulip]: https://bytecodealliance.zulipchat.com/#narrow/stream/219900-wasi

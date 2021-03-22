@@ -3,7 +3,7 @@ use crate::summon_bat::summon_bat;
 use crate::{
     lazy_output::FromLazyOutput,
     open_output::{open_output, Output},
-    Pseudonym, Type,
+    MediaType, Pseudonym,
 };
 use basic_text::{TextStr, TextWriter, WriteText};
 use clap::TryFromOsArg;
@@ -51,7 +51,7 @@ use utf8_io::{Utf8Writer, WriteStr};
 pub struct OutputTextStream {
     name: String,
     writer: TextWriter<Utf8Writer<LayeredWriter<TerminalWriter<StreamWriter>>>>,
-    type_: Type,
+    media_type: MediaType,
     helper_child: Option<(Child, StreamWriter)>,
 }
 
@@ -74,8 +74,8 @@ impl OutputTextStream {
     /// known as MIME type, return it. Otherwise default to
     /// "text/plain; charset=utf-8".
     #[inline]
-    pub fn type_(&self) -> &Type {
-        &self.type_
+    pub fn media_type(&self) -> &MediaType {
+        &self.media_type
     }
 
     fn from_output(output: Output) -> Self {
@@ -91,7 +91,7 @@ impl OutputTextStream {
 
         #[cfg(unix)]
         if is_terminal && is_stdout {
-            let stdout_helper_child = summon_bat(&terminal, &output.type_);
+            let stdout_helper_child = summon_bat(&terminal, &output.media_type);
 
             if let Some(mut stdout_helper_child) = stdout_helper_child {
                 let writer = StreamWriter::child_stdin(stdout_helper_child.stdin.take().unwrap());
@@ -104,7 +104,7 @@ impl OutputTextStream {
                 return Self {
                     name: output.name,
                     writer,
-                    type_: output.type_,
+                    media_type: output.media_type,
                     helper_child: Some((stdout_helper_child, terminal.into_inner())),
                 };
             }
@@ -113,11 +113,11 @@ impl OutputTextStream {
         let writer = LayeredWriter::new(terminal);
         let writer = Utf8Writer::new(writer);
         let writer = TextWriter::with_ansi_color_output(writer);
-        let type_ = output.type_.merge(Type::text());
+        let media_type = output.media_type.union(MediaType::text());
         Self {
             name: output.name,
             writer,
-            type_,
+            media_type,
             helper_child: None,
         }
     }
@@ -134,7 +134,7 @@ impl TryFromOsArg for OutputTextStream {
 
     #[inline]
     fn try_from_os_str_arg(os: &OsStr) -> anyhow::Result<Self> {
-        open_output(os, Type::text()).map(Self::from_output)
+        open_output(os, MediaType::text()).map(Self::from_output)
     }
 }
 
@@ -267,8 +267,8 @@ impl Drop for OutputTextStream {
 impl FromLazyOutput for OutputTextStream {
     type Err = anyhow::Error;
 
-    fn from_lazy_output(name: OsString, type_: Type) -> Result<Self, anyhow::Error> {
-        open_output(&name, type_).map(Self::from_output)
+    fn from_lazy_output(name: OsString, media_type: MediaType) -> Result<Self, anyhow::Error> {
+        open_output(&name, media_type).map(Self::from_output)
     }
 }
 
@@ -276,7 +276,7 @@ impl Debug for OutputTextStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // Don't print the name here, as that's an implementation detail.
         let mut b = f.debug_struct("OutputTextStream");
-        b.field("type_", &self.type_);
+        b.field("media_type", &self.media_type);
         b.finish()
     }
 }

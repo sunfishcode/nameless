@@ -5,12 +5,12 @@ use std::ffi::OsStr;
 /// (aka Mime Type) or a filename extension, both, or neither if nothing
 /// is known.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Type {
+pub struct MediaType {
     mime: Mime,
     extension: String,
 }
 
-impl Type {
+impl MediaType {
     /// Construct a type representing completely unknown contents.
     pub fn unknown() -> Self {
         Self {
@@ -80,28 +80,28 @@ impl Type {
     }
 
     /// Return a type which is the generalization of `self` and `other`. Falls
-    /// back to `Type::unknown()` if it cannot be determined.
-    pub fn merge(self, other: Self) -> Self {
+    /// back to `MediaType::unknown()` if it cannot be determined.
+    pub fn union(self, other: Self) -> Self {
         if self == other {
             self
-        } else if other == Type::unknown() {
+        } else if other == MediaType::unknown() {
             self
-        } else if self == Type::unknown() {
+        } else if self == MediaType::unknown() {
             other
-        } else if other == Type::text() {
+        } else if other == MediaType::text() {
             if self.mime.type_() == other.mime.type_() {
                 self
             } else {
-                Type::unknown()
+                MediaType::unknown()
             }
-        } else if self == Type::text() {
+        } else if self == MediaType::text() {
             if self.mime.type_() == other.mime.type_() {
                 other
             } else {
-                Type::unknown()
+                MediaType::unknown()
             }
         } else {
-            Type::unknown()
+            MediaType::unknown()
         }
     }
 }

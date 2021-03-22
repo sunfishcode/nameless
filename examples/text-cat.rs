@@ -3,21 +3,21 @@
 
 use basic_text::copy_text;
 use itertools::Itertools;
-use nameless::{InputTextStream, LazyOutput, OutputTextStream, Type};
+use nameless::{InputTextStream, LazyOutput, MediaType, OutputTextStream};
 
 /// # Arguments
 ///
 /// * `inputs` - Input sources, stdin if none
 #[kommand::main]
 fn main(output: LazyOutput<OutputTextStream>, inputs: Vec<InputTextStream>) -> anyhow::Result<()> {
-    let type_ = match inputs.iter().next() {
-        Some(first) if inputs.iter().map(InputTextStream::type_).all_equal() => {
-            first.type_().clone()
+    let media_type = match inputs.iter().next() {
+        Some(first) if inputs.iter().map(InputTextStream::media_type).all_equal() => {
+            first.media_type().clone()
         }
-        _ => Type::text(),
+        _ => MediaType::text(),
     };
 
-    let mut output = output.materialize(type_)?;
+    let mut output = output.materialize(media_type)?;
 
     for mut input in inputs {
         copy_text(&mut input, &mut output)?;
