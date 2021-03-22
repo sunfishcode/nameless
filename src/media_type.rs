@@ -1,5 +1,6 @@
 use mime::Mime;
 use std::ffi::OsStr;
+use std::str::FromStr;
 
 /// The type of content in a stream. This can be either a Media Type
 /// (aka Mime Type) or a filename extension, both, or neither if nothing
@@ -47,17 +48,22 @@ impl MediaType {
     pub fn from_extension(extension: Option<&OsStr>) -> Self {
         if let Some(ext) = extension {
             if let Some(s) = ext.to_str() {
-                let guess = mime_guess::from_ext(s);
+                let mut guesses = mime_guess::from_ext(s).iter();
 
-                let mime = if guess.count() == 1 {
-                    guess.first().unwrap()
+                if let Some(first) = guesses.next() {
+                    let mut merged = Self {
+                        mime: first,
+                        extension: s.to_string(),
+                    };
+                    for guess in guesses {
+                        merged = merged.union(Self {
+                            mime: guess,
+                            extension: s.to_string(),
+                        });
+                    }
+                    merged
                 } else {
-                    mime::STAR_STAR
-                };
-
-                Self {
-                    mime,
-                    extension: s.to_string(),
+                    Self::unknown()
                 }
             } else {
                 Self::unknown()
@@ -88,6 +94,27 @@ impl MediaType {
             self
         } else if self == MediaType::unknown() {
             other
+        } else if self.mime.type_() == other.mime.type_()
+            && self.mime.suffix() == other.mime.suffix()
+            && self.mime.params().eq(other.mime.params())
+        {
+            if other.mime.subtype().as_str() == mime::STAR && other.mime.suffix().is_none() {
+                self
+            } else if self.mime.subtype().as_str() == mime::STAR && self.mime.suffix().is_none() {
+                other
+            } else {
+                // Create a new mime value with the subtype replaced by star.
+                let mut s = format!("{}/{}", self.mime.type_(), mime::STAR);
+                if let Some(suffix) = self.mime.suffix() {
+                    s += &format!("+{}", suffix);
+                }
+                if self.mime.params().next().is_some() {
+                    for param in self.mime.params() {
+                        s += &format!("; {}={}", param.0, param.1);
+                    }
+                }
+                MediaType::from_mime(Mime::from_str(&s).unwrap())
+            }
         } else if other == MediaType::text() {
             if self.mime.type_() == other.mime.type_() {
                 self
@@ -104,4 +131,24 @@ impl MediaType {
             MediaType::unknown()
         }
     }
+}
+
+#[test]
+fn mime_from_extension() {
+    use std::path::Path;
+    assert_eq!(MediaType::from_extension(None), MediaType::unknown());
+    assert_eq!(
+        MediaType::from_extension(Some(Path::new("jpg").as_ref())).mime(),
+        &Mime::from_str("image/jpeg").unwrap()
+    );
+}
+
+#[test]
+fn mime_union() {
+    assert_eq!(
+        MediaType::from_mime(Mime::from_str("image/jpeg").unwrap())
+            .union(MediaType::from_mime(Mime::from_str("image/png").unwrap()))
+            .mime(),
+        &Mime::from_str("image/*").unwrap()
+    );
 }
