@@ -1,6 +1,10 @@
 #[cfg(unix)]
 use crate::summon_bat::summon_bat;
-use crate::{OutputByteStream, Pseudonym, Type};
+use crate::{
+    lazy_output::FromLazyOutput,
+    open_output::{open_output, Output},
+    Pseudonym, Type,
+};
 use io_ext::{Bufferable, WriteExt};
 use io_ext_adapters::ExtWriter;
 use io_handles::WriteHandle;
@@ -15,7 +19,7 @@ use std::{
     str::FromStr,
 };
 use terminal_support::{Terminal, TerminalColorSupport, TerminalWriter, WriteTerminal};
-use text_streams::TextWriter;
+use text_formats::TextWriter;
 
 /// An output stream for plain text output.
 ///
@@ -47,7 +51,7 @@ pub struct OutputTextStream {
     name: String,
     writer: TextWriter<ExtWriter<TerminalWriter<WriteHandle>>>,
     type_: Type,
-    stdout_helper_child: Option<Child>,
+    helper_child: Option<(Child, WriteHandle)>,
 }
 
 impl OutputTextStream {
@@ -73,54 +77,40 @@ impl OutputTextStream {
         &self.type_
     }
 
-    /// Return an output byte stream representing standard output.
-    pub fn stdout(type_: Type) -> anyhow::Result<Self> {
-        let name = "-".to_owned();
-        let writer = WriteHandle::stdout()?;
-        let writer = TerminalWriter::with_handle(writer);
-        let writer = ExtWriter::new(writer);
-        let writer = TextWriter::with_ansi_color_output(writer);
+    fn from_output(output: Output) -> Self {
+        let terminal = TerminalWriter::with_handle(output.writer);
+        let is_terminal = terminal.is_output_terminal();
+        let color_support = terminal.color_support();
+        let color_preference = terminal.color_preference();
 
         #[cfg(unix)]
-        {
-            let stdout_helper_child = summon_bat(&writer, &type_)?;
+        if is_terminal {
+            let stdout_helper_child = summon_bat(&terminal, &output.type_);
 
             if let Some(mut stdout_helper_child) = stdout_helper_child {
                 let writer = WriteHandle::child_stdin(stdout_helper_child.stdin.take().unwrap());
-                let writer = TerminalWriter::with_handle(writer);
+                let writer =
+                    TerminalWriter::from(writer, is_terminal, color_support, color_preference);
                 let writer = ExtWriter::new(writer);
                 let writer = TextWriter::with_ansi_color_output(writer);
 
-                return Ok(Self {
-                    name,
+                return Self {
+                    name: output.name,
                     writer,
-                    type_,
-                    stdout_helper_child: Some(stdout_helper_child),
-                });
+                    type_: output.type_,
+                    helper_child: Some((stdout_helper_child, terminal.into_inner())),
+                };
             }
         }
 
-        Ok(Self {
-            name,
+        let writer = ExtWriter::new(terminal);
+        let writer = TextWriter::with_ansi_color_output(writer);
+        Self {
+            name: output.name,
             writer,
-            type_,
-            stdout_helper_child: None,
-        })
-    }
-
-    fn from_str(s: &str) -> anyhow::Result<Self> {
-        let writer = OutputByteStream::from_str(s)?;
-        let (name, writer, type_) = writer.into_parts();
-        let writer = writer.abandon_into_inner().unwrap().into_inner();
-        let writer = TerminalWriter::with_handle(writer);
-        let writer = ExtWriter::new(writer);
-        let writer = TextWriter::new(writer);
-        Ok(Self {
-            name,
-            writer,
-            type_,
-            stdout_helper_child: None,
-        })
+            type_: output.type_,
+            helper_child: None,
+        }
     }
 }
 
@@ -134,7 +124,8 @@ impl FromStr for OutputTextStream {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self> {
-        Self::from_str(s)
+        // fixme: we'd ideally like to have some way to pass in a type.
+        open_output(s, Type::text()).map(Self::from_output)
     }
 }
 
@@ -143,8 +134,8 @@ impl WriteExt for OutputTextStream {
     fn end(&mut self) -> io::Result<()> {
         self.writer.end()?;
 
-        if let Some(mut stdout_helper_child) = self.stdout_helper_child.take() {
-            stdout_helper_child.wait()?;
+        if let Some(mut helper_child) = self.helper_child.take() {
+            helper_child.0.wait()?;
         }
 
         Ok(())
@@ -223,7 +214,7 @@ impl WriteTerminal for OutputTextStream {
 
 impl Drop for OutputTextStream {
     fn drop(&mut self) {
-        if let Some(mut stdout_helper_child) = self.stdout_helper_child.take() {
+        if let Some(mut helper_child) = self.helper_child.take() {
             // Wait for the child. We can't return `Err` from a `drop` function,
             // so just print a message and exit. Callers should use
             // `end()` to declare the end of the stream if they wish to avoid
@@ -235,7 +226,7 @@ impl Drop for OutputTextStream {
                 exit(libc::EXIT_FAILURE);
             }
 
-            match stdout_helper_child.wait() {
+            match helper_child.0.wait() {
                 Ok(status) => {
                     if !status.success() {
                         eprintln!(
@@ -252,6 +243,14 @@ impl Drop for OutputTextStream {
                 }
             }
         }
+    }
+}
+
+impl FromLazyOutput for OutputTextStream {
+    type Err = anyhow::Error;
+
+    fn from_lazy_output(name: String, type_: Type) -> Result<Self, anyhow::Error> {
+        open_output(&name, type_).map(Self::from_output)
     }
 }
 

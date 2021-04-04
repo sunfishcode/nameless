@@ -1,7 +1,7 @@
 use io_ext::InteractExt;
 use io_ext_adapters::ExtInteractor;
 use terminal_support::InteractTerminal;
-use text_streams::TextInteractor;
+use text_formats::TextInteractor;
 
 pub(crate) trait InteractTerminalExt: InteractExt + InteractTerminal {}
 

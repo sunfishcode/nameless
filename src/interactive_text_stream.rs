@@ -1,6 +1,6 @@
 use crate::{InteractiveByteStream, Pseudonym};
 use anyhow::anyhow;
-use io_ext::{Bufferable, ReadExt, InteractExt, Status, WriteExt};
+use io_ext::{Bufferable, InteractExt, ReadExt, Status, WriteExt};
 use io_ext_adapters::ExtInteractor;
 use io_handles::InteractHandle;
 #[cfg(unix)]
@@ -15,10 +15,10 @@ use std::{
     str::FromStr,
 };
 use terminal_support::{
-    ReadTerminal, InteractTerminal, Terminal, TerminalColorSupport, TerminalInteractor,
+    InteractTerminal, ReadTerminal, Terminal, TerminalColorSupport, TerminalInteractor,
     WriteTerminal,
 };
-use text_streams::{TextInteractor, ReadStr};
+use text_formats::{ReadStr, TextInteractor};
 use url::Url;
 #[cfg(not(windows))]
 use {crate::path_to_name::path_to_name, std::fs::OpenOptions};

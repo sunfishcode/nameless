@@ -1,4 +1,7 @@
-use crate::{InputByteStream, Pseudonym, Type};
+use crate::{
+    open_input::{open_input, Input},
+    Pseudonym, Type,
+};
 use io_ext::{Bufferable, ReadExt, Status};
 use io_ext_adapters::ExtReader;
 use io_handles::ReadHandle;
@@ -8,7 +11,7 @@ use std::{
     str::FromStr,
 };
 use terminal_support::TerminalReader;
-use text_streams::{TextReader, ReadStr};
+use text_formats::{ReadStr, TextReader};
 
 /// In input stream for plain text input.
 ///
@@ -69,35 +72,16 @@ impl InputTextStream {
         Pseudonym::new(self.name.clone())
     }
 
-    /// Return an input byte stream representing standard input.
-    pub fn stdin() -> anyhow::Result<Self> {
-        let stdin = InputByteStream::stdin()?;
-        let (name, reader, type_, initial_size) = stdin.into_parts();
-        let reader = reader.abandon_into_inner().unwrap().into_inner();
-        let reader = TerminalReader::with_handle(reader);
+    fn from_input(input: Input) -> Self {
+        let reader = TerminalReader::with_handle(input.reader);
         let reader = ExtReader::new(reader);
         let reader = TextReader::new(reader);
-        Ok(Self {
-            name,
+        Self {
+            name: input.name,
             reader,
-            type_,
-            initial_size,
-        })
-    }
-
-    fn from_str(s: &str) -> anyhow::Result<Self> {
-        let reader = InputByteStream::from_str(s)?;
-        let (name, reader, type_, initial_size) = reader.into_parts();
-        let reader = reader.abandon_into_inner().unwrap().into_inner();
-        let reader = TerminalReader::with_handle(reader);
-        let reader = ExtReader::new(reader);
-        let reader = TextReader::new(reader);
-        Ok(Self {
-            name,
-            reader,
-            type_,
-            initial_size,
-        })
+            type_: input.type_,
+            initial_size: input.initial_size,
+        }
     }
 }
 
@@ -112,7 +96,7 @@ impl FromStr for InputTextStream {
 
     #[inline]
     fn from_str(s: &str) -> anyhow::Result<Self> {
-        Self::from_str(s)
+        open_input(s).map(Self::from_input)
     }
 }
 

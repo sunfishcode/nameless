@@ -1,7 +1,7 @@
 //! A simple grep-like program using `kommand` and `InputTextStream`.
 //! Unlike regular grep, this grep supports URLs and gzip. Perg!
 
-use nameless::{InputTextStream, OutputTextStream, Type};
+use nameless::{InputTextStream, LazyOutput, OutputTextStream, Type};
 use regex::Regex;
 use std::io::{BufRead, BufReader, Write};
 
@@ -11,14 +11,12 @@ fn main(
     /// The regex to search for.
     pattern: Regex,
 
-    /// Input sources, stdin if none.
-    mut inputs: Vec<InputTextStream>,
-) -> anyhow::Result<()> {
-    let mut output = OutputTextStream::stdout(Type::text())?;
+    output: LazyOutput<OutputTextStream>,
 
-    if inputs.is_empty() {
-        inputs.push(InputTextStream::stdin()?);
-    }
+    /// Input sources.
+    inputs: Vec<InputTextStream>,
+) -> anyhow::Result<()> {
+    let mut output = output.materialize(Type::text())?;
 
     let print_inputs = inputs.len() > 1;
 

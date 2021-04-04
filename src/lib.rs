@@ -143,13 +143,16 @@ pub use mime::Mime;
 
 mod input_byte_stream;
 mod input_text_stream;
+mod interact_terminal_ext;
 mod interactive_byte_stream;
 mod interactive_text_stream;
+mod lazy_output;
+mod open_input;
+mod open_output;
 mod output_byte_stream;
 mod output_text_stream;
 mod path_to_name;
 mod pseudonym;
-mod interact_terminal_ext;
 #[cfg(unix)]
 mod summon_bat;
 mod r#type;
@@ -158,6 +161,7 @@ pub use input_byte_stream::InputByteStream;
 pub use input_text_stream::InputTextStream;
 pub use interactive_byte_stream::InteractiveByteStream;
 pub use interactive_text_stream::InteractiveTextStream;
+pub use lazy_output::LazyOutput;
 pub use output_byte_stream::OutputByteStream;
 pub use output_text_stream::OutputTextStream;
 pub use pseudonym::Pseudonym;

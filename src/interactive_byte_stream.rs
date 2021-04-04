@@ -2,7 +2,7 @@ use crate::Pseudonym;
 use anyhow::anyhow;
 use io_ext::{
     default_read, default_read_exact, default_read_to_end, default_read_to_string,
-    default_read_vectored, Bufferable, ReadExt, InteractExt, Status, WriteExt,
+    default_read_vectored, Bufferable, InteractExt, ReadExt, Status, WriteExt,
 };
 use io_ext_adapters::ExtInteractor;
 use io_handles::InteractHandle;
@@ -16,7 +16,7 @@ use std::{
     str::FromStr,
 };
 use terminal_support::{
-    NeverTerminalInteractor, ReadTerminal, InteractTerminal, Terminal, TerminalColorSupport,
+    InteractTerminal, NeverTerminalInteractor, ReadTerminal, Terminal, TerminalColorSupport,
     WriteTerminal,
 };
 use url::Url;
@@ -207,10 +207,7 @@ impl InteractiveByteStream {
 
             let name = path_to_name("accept", addr.as_pathname().unwrap())?;
 
-            return Ok(Self {
-                name,
-                interactor,
-            });
+            return Ok(Self { name, interactor });
         }
 
         #[cfg(windows)]
@@ -239,10 +236,7 @@ impl InteractiveByteStream {
         let interactor = InteractHandle::char_device(interactor);
         let interactor = NeverTerminalInteractor::new(interactor);
         let interactor = ExtInteractor::new(interactor);
-        Ok(Self {
-            name,
-            interactor,
-        })
+        Ok(Self { name, interactor })
     }
 
     /// Construct a new instance from a plain filesystem path.

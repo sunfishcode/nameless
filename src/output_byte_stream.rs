@@ -1,18 +1,18 @@
-use crate::{path_to_name::path_to_name, Pseudonym, Type};
+use crate::{
+    lazy_output::FromLazyOutput,
+    open_output::{open_output, Output},
+    Pseudonym, Type,
+};
 use anyhow::anyhow;
-use flate2::{write::GzEncoder, Compression};
 use io_ext::{Bufferable, WriteExt};
 use io_ext_adapters::ExtWriter;
 use io_handles::WriteHandle;
 use std::{
     fmt::{self, Arguments, Debug, Formatter},
-    fs::File,
     io::{self, IoSlice, Write},
-    path::Path,
     str::FromStr,
 };
-use terminal_support::NeverTerminalWriter;
-use url::Url;
+use terminal_support::{NeverTerminalWriter, TerminalWriter, WriteTerminal};
 
 /// An output stream for binary output.
 ///
@@ -69,142 +69,20 @@ impl OutputByteStream {
         &self.type_
     }
 
-    /// Used by `OutputTextStream` to convert from `OutputByteStream`.
-    #[inline]
-    pub(crate) fn into_parts(self) -> (String, ExtWriter<NeverTerminalWriter<WriteHandle>>, Type) {
-        (self.name, self.writer, self.type_)
-    }
+    fn from_output(output: Output) -> anyhow::Result<Self> {
+        let writer = NeverTerminalWriter::new(output.writer);
 
-    fn from_str(s: &str) -> Result<Self, anyhow::Error> {
-        // If we can parse it as a URL, treat it as such.
-        if let Ok(url) = Url::parse(s) {
-            return Self::from_url(url);
-        }
-
-        // Special-case "-" to mean stdout.
-        if s == "-" {
-            return Self::stdout(Type::unknown());
-        }
-
-        // Strings beginning with "$(" are commands.
-        #[cfg(not(windows))]
-        if s.starts_with("$(") {
-            return Self::from_child(s);
-        }
-
-        // Otherwise try opening it as a path in the filesystem namespace.
-        Self::from_path(Path::new(s))
-    }
-
-    /// Return an output byte stream representing standard output.
-    pub fn stdout(type_: Type) -> anyhow::Result<Self> {
-        let stdout = WriteHandle::stdout()?;
-
-        // fixme:
-        //   - don't do this when we're called from OutputTextStream
-        //   - do do this on other ttys (char devices, etc.)
-        #[cfg(not(windows))]
-        if posish::io::isatty(&stdout) {
+        let writer = TerminalWriter::with_handle(writer);
+        if writer.is_output_terminal() {
             return Err(anyhow!("attempted to write binary output to a terminal"));
         }
 
-        #[cfg(windows)]
-        if atty::is(atty::Stream::Stdout) {
-            return Err(anyhow!("attempted to write binary output to a terminal"));
-        }
+        let writer = ExtWriter::new(writer.into_inner());
 
-        let writer = NeverTerminalWriter::new(stdout);
-        let writer = ExtWriter::new(writer);
         Ok(Self {
-            name: "-".to_owned(),
+            name: output.name,
             writer,
-            type_,
-        })
-    }
-
-    /// Construct a new instance from a URL.
-    fn from_url(url: Url) -> anyhow::Result<Self> {
-        match url.scheme() {
-            // TODO: POST the data to HTTP? But the `Write` trait makes this
-            // tricky because there's no hook for closing and finishing the
-            // stream. `Drop` can't fail.
-            "http" | "https" => Err(anyhow!("output to HTTP not supported yet")),
-            "file" => {
-                if !url.username().is_empty()
-                    || url.password().is_some()
-                    || url.has_host()
-                    || url.port().is_some()
-                    || url.query().is_some()
-                    || url.fragment().is_some()
-                {
-                    return Err(anyhow!("file URL should only contain a path"));
-                }
-                // TODO: https://docs.rs/url/latest/url/struct.Url.html#method.to_file_path
-                // is ambiguous about how it can fail. What is `Path::new_opt`?
-                Self::from_path(
-                    &url.to_file_path()
-                        .map_err(|_: ()| anyhow!("unknown file URL weirdness"))?,
-                )
-            }
-            "data" => Err(anyhow!("output to data URL isn't possible")),
-            other => Err(anyhow!("unsupported URL scheme \"{}\"", other)),
-        }
-    }
-
-    /// Construct a new instance from a plain filesystem path.
-    fn from_path(path: &Path) -> anyhow::Result<Self> {
-        let name = path_to_name("file", path)?;
-        let file = File::create(path).map_err(|err| anyhow!("{}: {}", path.display(), err))?;
-        if path.extension() == Some(Path::new("gz").as_os_str()) {
-            // TODO: We shouldn't really need to allocate a `PathBuf` here.
-            let path = path.with_extension("");
-            let type_ = Type::from_extension(path.extension());
-            // 6 is the default gzip compression level.
-            let writer =
-                WriteHandle::piped_thread(Box::new(GzEncoder::new(file, Compression::new(6))))?;
-            let writer = NeverTerminalWriter::new(writer);
-            let writer = ExtWriter::new(writer);
-            Ok(Self {
-                name,
-                writer,
-                type_,
-            })
-        } else {
-            let type_ = Type::from_extension(path.extension());
-            let writer = WriteHandle::file(file);
-            let writer = NeverTerminalWriter::new(writer);
-            let writer = ExtWriter::new(writer);
-            Ok(Self {
-                name,
-                writer,
-                type_,
-            })
-        }
-    }
-
-    #[cfg(not(windows))]
-    fn from_child(s: &str) -> anyhow::Result<Self> {
-        use std::process::{Command, Stdio};
-        assert!(s.starts_with("$("));
-        if !s.ends_with(')') {
-            return Err(anyhow!("child string must end in ')'"));
-        }
-        let words = shell_words::split(&s[2..s.len() - 1])?;
-        let (first, rest) = words
-            .split_first()
-            .ok_or_else(|| anyhow!("child stream specified with '(...)' must contain a command"))?;
-        let child = Command::new(first)
-            .args(rest)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .spawn()?;
-        let writer = WriteHandle::child_stdin(child.stdin.unwrap());
-        let writer = NeverTerminalWriter::new(writer);
-        let writer = ExtWriter::new(writer);
-        Ok(Self {
-            name: s.to_owned(),
-            writer,
-            type_: Type::unknown(),
+            type_: output.type_,
         })
     }
 }
@@ -219,7 +97,7 @@ impl FromStr for OutputByteStream {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self> {
-        Self::from_str(s)
+        open_output(s, Type::unknown()).and_then(Self::from_output)
     }
 }
 
@@ -278,6 +156,14 @@ impl Bufferable for OutputByteStream {
     #[inline]
     fn abandon(&mut self) {
         self.writer.abandon()
+    }
+}
+
+impl FromLazyOutput for OutputByteStream {
+    type Err = anyhow::Error;
+
+    fn from_lazy_output(name: String, type_: Type) -> Result<Self, anyhow::Error> {
+        open_output(&name, type_).and_then(Self::from_output)
     }
 }
 

@@ -3,7 +3,7 @@
 
 use itertools::Itertools;
 use nameless::{InputTextStream, OutputTextStream, Type};
-use text_streams::copy_str;
+use text_formats::copy_text;
 
 #[rustfmt::skip] // TODO: rustfmt mishandles doc comments on arguments
 #[kommand::main]
@@ -19,7 +19,7 @@ fn main(
     let mut output = OutputTextStream::stdout(type_)?;
 
     for mut input in inputs {
-        copy_str(&mut input, &mut output)?;
+        copy_text(&mut input, &mut output)?;
     }
 
     Ok(())

@@ -24,7 +24,7 @@ memchr = "2.3.4"
 mime = "0.3.16"
 mime_guess = "2.0.3"
 percent-encoding = "2.1.0"
-text-streams = { path = "../text-streams", features = ["terminal-support"] }
+text-formats = { path = "../text-formats", features = ["terminal-support"] }
 unsafe-io = { path = "../unsafe-io" }
 readwrite = { version = "0.1.2", optional = true }
 ureq = { version = "1.5.4", default-features = false, features = ["tls", "charset"] }

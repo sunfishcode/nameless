@@ -76,4 +76,30 @@ impl Type {
     pub fn extension(&self) -> &str {
         &self.extension
     }
+
+    /// Return a type which is the generalization of `self` and `other`. Falls
+    /// back to `Type::unknown()` if it cannot be determined.
+    pub fn merge(self, other: Self) -> Self {
+        if self == other {
+            self.clone()
+        } else if other == Type::unknown() {
+            self.clone()
+        } else if self == Type::unknown() {
+            other.clone()
+        } else if other == Type::text() {
+            if self.mime.type_() == other.mime.type_() {
+                self.clone()
+            } else {
+                Type::unknown()
+            }
+        } else if self == Type::text() {
+            if self.mime.type_() == other.mime.type_() {
+                other.clone()
+            } else {
+                Type::unknown()
+            }
+        } else {
+            Type::unknown()
+        }
+    }
 }
