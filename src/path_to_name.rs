@@ -61,7 +61,7 @@ pub(crate) fn path_to_name(_scheme: &str, path: &Path) -> anyhow::Result<String>
                     path.display()
                 )
             })?
-            .into_string())
+            .into())
     } else {
         Err(anyhow!("not supported yet: non-UTF-8 relative paths",))
     }
