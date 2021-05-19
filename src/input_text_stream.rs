@@ -2,7 +2,7 @@ use crate::{
     open_input::{open_input, Input},
     MediaType, Pseudonym,
 };
-use basic_text::{ReadText, ReadTextLayered, TextReader, TextStr};
+use basic_text::{ReadText, ReadTextLayered, TextReader, TextSubstr};
 use clap::TryFromOsArg;
 use io_streams::StreamReader;
 use layered_io::{Bufferable, LayeredReader, ReadLayered, Status};
@@ -75,8 +75,6 @@ impl InputTextStream {
 
     fn from_input(input: Input) -> Self {
         let reader = TerminalReader::with_handle(input.reader);
-        let reader = LayeredReader::new(reader);
-        let reader = Utf8Reader::new(reader);
         let reader = TextReader::new(reader);
         let media_type = input.media_type.union(MediaType::text());
         Self {
@@ -174,25 +172,28 @@ impl ReadStrLayered for InputTextStream {
 
 impl ReadText for InputTextStream {
     #[inline]
-    fn read_text(&mut self, buf: &mut TextStr) -> io::Result<usize> {
-        self.reader.read_text(buf)
+    fn read_text_substr(&mut self, buf: &mut TextSubstr) -> io::Result<usize> {
+        self.reader.read_text_substr(buf)
     }
 
     #[inline]
-    fn read_exact_text(&mut self, buf: &mut TextStr) -> io::Result<()> {
-        self.reader.read_exact_text(buf)
+    fn read_exact_text_substr(&mut self, buf: &mut TextSubstr) -> io::Result<()> {
+        self.reader.read_exact_text_substr(buf)
     }
 }
 
 impl ReadTextLayered for InputTextStream {
     #[inline]
-    fn read_text_with_status(&mut self, buf: &mut TextStr) -> io::Result<(usize, Status)> {
-        self.reader.read_text_with_status(buf)
+    fn read_text_substr_with_status(
+        &mut self,
+        buf: &mut TextSubstr,
+    ) -> io::Result<(usize, Status)> {
+        self.reader.read_text_substr_with_status(buf)
     }
 
     #[inline]
-    fn read_exact_text_using_status(&mut self, buf: &mut TextStr) -> io::Result<Status> {
-        self.reader.read_exact_text_using_status(buf)
+    fn read_exact_text_substr_using_status(&mut self, buf: &mut TextSubstr) -> io::Result<Status> {
+        self.reader.read_exact_text_substr_using_status(buf)
     }
 }
 

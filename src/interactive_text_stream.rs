@@ -53,8 +53,6 @@ impl InteractiveTextStream {
 
     fn from_interactive(interactive: Interactive) -> Self {
         let duplexer = TerminalDuplexer::with_handle(interactive.duplexer);
-        let duplexer = LayeredDuplexer::new(duplexer);
-        let duplexer = Utf8Duplexer::new(duplexer);
         let duplexer = TextDuplexer::new(duplexer);
         Self {
             name: interactive.name,
