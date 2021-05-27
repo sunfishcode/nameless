@@ -7,6 +7,7 @@ use pulldown_cmark::{Event, OffsetIter, Options, Parser, Tag};
 use quote::{format_ident, quote, quote_spanned};
 use std::cmp::max;
 use std::collections::HashSet;
+use std::env::var_os;
 use std::ops::{Bound, Range, RangeBounds};
 use syn::{
     parse_macro_input, parse_quote,
@@ -182,6 +183,16 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
         });
     }
 
+    // Use the cargo crate name if we can, because otherwise clap defaults to
+    // the package name.
+    let program_name = match var_os("CARGO_CRATE_NAME") {
+        Some(name) => {
+            let name = name.to_string_lossy();
+            quote! { name = #name, }
+        }
+        None => quote! {},
+    };
+
     // Import `nameless::clap` so that clap_derive's macro expansions can
     // use it, and our users don't need to manually import it. In theory
     // there are cleaner ways to do this, but as a macro-around-a-macro,
@@ -190,7 +201,7 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
         use nameless::clap;
 
         #[derive(clap::Clap)]
-        #[clap(#(about=#abouts)*)]
+        #[clap(#program_name #(about=#abouts)*)]
         struct _KommandOpt {
             #(#[doc = #arg_docs] #args,)*
         }
