@@ -2,7 +2,7 @@
 
 use heck::ShoutySnakeCase;
 use proc_macro::TokenStream;
-use proc_macro2::{Literal as Literal2, Span as Span2, TokenTree as TokenTree2};
+use proc_macro2::{Span as Span2, TokenStream as TokenStream2};
 use pulldown_cmark::{Event, OffsetIter, Options, Parser, Tag};
 use quote::{format_ident, quote, quote_spanned};
 use std::cmp::max;
@@ -12,7 +12,7 @@ use syn::{
     parse_macro_input, parse_quote,
     spanned::Spanned,
     visit_mut::{self, VisitMut},
-    Expr, Ident, Pat, Stmt,
+    Expr, Ident, LitStr, Pat, Stmt,
 };
 
 #[proc_macro_attribute]
@@ -53,9 +53,16 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
             // That's it.
             assert!(tokens.next().is_none());
 
-            let mut s = match content {
-                TokenTree2::Literal(literal) => parse_string_literal(literal),
-                _ => unreachable!(),
+            let content_span = content.span();
+            let c: TokenStream2 = content.into();
+            let c: TokenStream = c.into();
+            let mut s = match syn::parse::<LitStr>(c) {
+                Ok(lit_str) => lit_str.value(),
+                Err(_err) => {
+                    return TokenStream::from(quote_spanned! { content_span =>
+                        compile_error!("error parsing string literal");
+                    });
+                }
             };
 
             // Trim leading whitespace from the start, because that's
@@ -459,29 +466,6 @@ impl VisitMut for EnvVisitor {
         // Delegate to the default impl to visit any nested statements.
         visit_mut::visit_stmt_mut(self, stmt);
     }
-}
-
-// Convert a `Literal` holding a string literal into the `String`.
-//
-// FIXME: It feels like there should be an easier way to do this.
-fn parse_string_literal(literal: Literal2) -> String {
-    let s = literal.to_string();
-    assert!(
-        s.starts_with('"') && s.ends_with('"'),
-        "string literal must be enclosed in double-quotes"
-    );
-
-    let trimmed = s[1..s.len() - 1].to_owned();
-    assert!(
-        !trimmed.contains('"'),
-        "string literal must not contain embedded quotes for now"
-    );
-    assert!(
-        !trimmed.contains('\\'),
-        "string literal must not contain embedded backslashes for now"
-    );
-
-    trimmed
 }
 
 // Match rustdoc's options.

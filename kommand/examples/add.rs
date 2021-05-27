@@ -1,4 +1,5 @@
-/// Simple example, add numbers given on the command-line and environment variables
+/// Simple example program that adds numbers given on the command-line and
+/// in environment variables.
 ///
 /// # Arguments
 ///
@@ -8,7 +9,7 @@
 /// # Environment Variables
 ///
 /// * `z` - z for zest
-/// * `w` - there is not a touble, you know it is a w
+/// * `w` - it's not any trouble, you know it's a w
 #[kommand::main]
 fn main(x: i32, y: i32) {
     #[env_or_default]
