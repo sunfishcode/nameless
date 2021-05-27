@@ -13,9 +13,9 @@
 #[kommand::main]
 fn main(x: i32, y: i32) {
     #[env_or_default]
-    let z: i32 = 100;
+    let z: i32 = 0;
     #[env_or_default]
-    let w: i32 = 1000;
+    let w: i32 = 0;
 
     println!("{}", x + y + z + w);
 }
