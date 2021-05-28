@@ -2,7 +2,7 @@
 
 use heck::ShoutySnakeCase;
 use proc_macro::TokenStream;
-use proc_macro2::{Span as Span2, TokenStream as TokenStream2};
+use proc_macro2::{Ident as Ident2, Span as Span2, TokenStream as TokenStream2};
 use pulldown_cmark::{Event, OffsetIter, Options, Parser, Tag};
 use quote::{format_ident, quote, quote_spanned};
 use std::cmp::max;
@@ -13,7 +13,7 @@ use syn::{
     parse_macro_input, parse_quote,
     spanned::Spanned,
     visit_mut::{self, VisitMut},
-    Expr, Ident, LitStr, Pat, Stmt,
+    Expr, Ident, LitStr, Pat, Stmt, Type,
 };
 
 #[proc_macro_attribute]
@@ -325,133 +325,14 @@ impl VisitMut for EnvVisitor {
                     //
                     // [autoref specialization]: http://lukaskalbertodt.github.io/2019/12/05/generalized-autoref-based-specialization.html
                     let default = init.1.clone();
-                    let case_insensitive = false;
-                    let initializer: Expr = parse_quote! {
-                        match _kommand_env.#pat {
-                            Some(os_str) => match {
-                                use std::convert::{Infallible, TryFrom};
-                                use std::ffi::{OsStr, OsString};
-                                use std::str::FromStr;
-                                use std::marker::PhantomData;
-
-                                struct Wrap<T>(T);
-                                trait Specialize8 {
-                                    type Return;
-                                    fn specialized(&self) -> Self::Return;
-                                }
-                                impl<'a, T: clap::ArgEnum> Specialize8 for &&&&&&&&Wrap<(&'a OsStr, PhantomData<T>)> {
-                                    type Return = Result<T, Result<String, OsString>>;
-                                    fn specialized(&self) -> Self::Return {
-                                        match self.0.0.to_str() {
-                                            None => Err(Err(self.0.0.to_os_string())),
-                                            Some(s) => T::from_str(s, #case_insensitive).map_err(Ok),
-                                        }
-                                    }
-                                }
-                                trait Specialize7 {
-                                    type Return;
-                                    fn specialized(&self) -> Self::Return;
-                                }
-                                impl<'a, T: clap::TryFromOsArg> Specialize7 for &&&&&&&Wrap<(&'a OsStr, PhantomData<T>)> {
-                                    type Return = Result<T, Result<T::Error, OsString>>;
-                                    fn specialized(&self) -> Self::Return {
-                                        T::try_from_os_str_arg(
-                                            self.0.0,
-                                        ).map_err(Ok)
-                                    }
-                                }
-                                trait Specialize6 {
-                                    type Return;
-                                    fn specialized(&self) -> Self::Return;
-                                }
-                                impl<'a, T: TryFrom<&'a OsStr>> Specialize6 for &&&&&&Wrap<(&'a OsStr, PhantomData<T>)> {
-                                    type Return = Result<T, Result<T::Error, OsString>>;
-                                    fn specialized(&self) -> Self::Return {
-                                        T::try_from(self.0.0).map_err(Ok)
-                                    }
-                                }
-                                trait Specialize5 {
-                                    type Return;
-                                    fn specialized(&self) -> Self::Return;
-                                }
-                                impl<T: FromStr> Specialize5 for &&&&&Wrap<(&OsStr, PhantomData<T>)> {
-                                    type Return = Result<T, Result<T::Err, OsString>>;
-                                    fn specialized(&self) -> Self::Return {
-                                        match self.0.0.to_str() {
-                                            None => Err(Err(self.0.0.to_os_string())),
-                                            Some(s) => T::from_str(s).map_err(Ok),
-                                        }
-                                    }
-                                }
-                                trait Specialize4 {
-                                    type Return;
-                                    fn specialized(&self) -> Self::Return;
-                                }
-                                impl<'a, T: TryFrom<&'a str>> Specialize4 for &&&&Wrap<(&'a OsStr, PhantomData<T>)> {
-                                    type Return = Result<T, Result<T::Error, OsString>>;
-                                    fn specialized(&self) -> Self::Return {
-                                        match self.0.0.to_str() {
-                                            None => Err(Err(self.0.0.to_os_string())),
-                                            Some(s) => T::try_from(s).map_err(Ok),
-                                        }
-                                    }
-                                }
-                                trait Specialize3 {
-                                    type Return;
-                                    fn specialized(&self) -> Self::Return;
-                                }
-                                impl<'a, T: From<&'a OsStr>> Specialize3 for &&&Wrap<(&'a OsStr, PhantomData<T>)> {
-                                    type Return = Result<T, Result<Infallible, OsString>>;
-                                    fn specialized(&self) -> Self::Return {
-                                        Ok(T::from(self.0.0))
-                                    }
-                                }
-                                trait Specialize2 {
-                                    type Return;
-                                    fn specialized(&self) -> Self::Return;
-                                }
-                                impl<'a, T: From<&'a str>> Specialize2 for &&Wrap<(&'a OsStr, PhantomData<T>)> {
-                                    type Return = Result<T, Result<Infallible, OsString>>;
-                                    fn specialized(&self) -> Self::Return {
-                                        match self.0.0.to_str() {
-                                            None => Err(Err(self.0.0.to_os_string())),
-                                            Some(s) => Ok(T::from(s)),
-                                        }
-                                    }
-                                }
-                                trait Specialize1 {
-                                    type Return;
-                                    fn specialized(&self) -> Self::Return;
-                                }
-                                impl<'a, T> Specialize1 for &Wrap<(&'a OsStr, PhantomData<T>)> {
-                                    type Return = Result<T, Result<String, OsString>>;
-                                    fn specialized(&self) -> Self::Return {
-                                        Err(Ok(format!(
-                                            "Type `{}` does not implement any of the parsing traits: \
-                                            `clap::ArgEnum`, `clap::TryFromOsArg`, `TryFrom<&OsStr>`, `FromStr`, \
-                                            `TryFrom<&str>`, `From<&OsStr>`, or `From<&str>`",
-                                            stringify!(#result_type)
-                                        )))
-                                    }
-                                }
-                                (&&&&&&&&Wrap((os_str.as_os_str(), PhantomData::<#result_type>))).specialized()
-                            } {
-                                Ok(value) => value,
-                                Err(e) => {
-                                    // TODO: Prettier errors.
-                                    eprintln!("environment variable parsing error: {:?}", e);
-                                    std::process::exit(3);
-                                }
-                            }
-                            None => #default,
-                        }
-                    };
+                    let pat_ident = pat.ident.clone();
+                    let initializer =
+                        generate_env_initializer(default, pat_ident.clone(), result_type);
                     *init.1 = initializer;
 
                     // Record the variable name so that we can check for duplicates
                     // and undocumented errors.
-                    let env_name = pat
-                        .ident
+                    let env_name = pat_ident
                         .to_string()
                         .to_shouty_snake_case()
                         .escape_default()
@@ -476,6 +357,130 @@ impl VisitMut for EnvVisitor {
 
         // Delegate to the default impl to visit any nested statements.
         visit_mut::visit_stmt_mut(self, stmt);
+    }
+}
+
+fn generate_env_initializer(default: Box<Expr>, pat_ident: Ident2, result_type: Box<Type>) -> Expr {
+    let case_insensitive = false;
+    parse_quote! {
+        match _kommand_env.#pat_ident {
+            Some(os_str) => match {
+                use std::convert::{Infallible, TryFrom};
+                use std::ffi::{OsStr, OsString};
+                use std::str::FromStr;
+                use std::marker::PhantomData;
+
+                struct Wrap<T>(T);
+                trait Specialize8 {
+                    type Return;
+                    fn specialized(&self) -> Self::Return;
+                }
+                impl<'a, T: clap::ArgEnum> Specialize8 for &&&&&&&&Wrap<(&'a OsStr, PhantomData<T>)> {
+                    type Return = Result<T, Result<String, OsString>>;
+                    fn specialized(&self) -> Self::Return {
+                        match self.0.0.to_str() {
+                            None => Err(Err(self.0.0.to_os_string())),
+                            Some(s) => T::from_str(s, #case_insensitive).map_err(Ok),
+                        }
+                    }
+                }
+                trait Specialize7 {
+                    type Return;
+                    fn specialized(&self) -> Self::Return;
+                }
+                impl<'a, T: clap::TryFromOsArg> Specialize7 for &&&&&&&Wrap<(&'a OsStr, PhantomData<T>)> {
+                    type Return = Result<T, Result<T::Error, OsString>>;
+                    fn specialized(&self) -> Self::Return {
+                        T::try_from_os_str_arg(
+                            self.0.0,
+                        ).map_err(Ok)
+                    }
+                }
+                trait Specialize6 {
+                    type Return;
+                    fn specialized(&self) -> Self::Return;
+                }
+                impl<'a, T: TryFrom<&'a OsStr>> Specialize6 for &&&&&&Wrap<(&'a OsStr, PhantomData<T>)> {
+                    type Return = Result<T, Result<T::Error, OsString>>;
+                    fn specialized(&self) -> Self::Return {
+                        T::try_from(self.0.0).map_err(Ok)
+                    }
+                }
+                trait Specialize5 {
+                    type Return;
+                    fn specialized(&self) -> Self::Return;
+                }
+                impl<T: FromStr> Specialize5 for &&&&&Wrap<(&OsStr, PhantomData<T>)> {
+                    type Return = Result<T, Result<T::Err, OsString>>;
+                    fn specialized(&self) -> Self::Return {
+                        match self.0.0.to_str() {
+                            None => Err(Err(self.0.0.to_os_string())),
+                            Some(s) => T::from_str(s).map_err(Ok),
+                        }
+                    }
+                }
+                trait Specialize4 {
+                    type Return;
+                    fn specialized(&self) -> Self::Return;
+                }
+                impl<'a, T: TryFrom<&'a str>> Specialize4 for &&&&Wrap<(&'a OsStr, PhantomData<T>)> {
+                    type Return = Result<T, Result<T::Error, OsString>>;
+                    fn specialized(&self) -> Self::Return {
+                        match self.0.0.to_str() {
+                            None => Err(Err(self.0.0.to_os_string())),
+                            Some(s) => T::try_from(s).map_err(Ok),
+                        }
+                    }
+                }
+                trait Specialize3 {
+                    type Return;
+                    fn specialized(&self) -> Self::Return;
+                }
+                impl<'a, T: From<&'a OsStr>> Specialize3 for &&&Wrap<(&'a OsStr, PhantomData<T>)> {
+                    type Return = Result<T, Result<Infallible, OsString>>;
+                    fn specialized(&self) -> Self::Return {
+                        Ok(T::from(self.0.0))
+                    }
+                }
+                trait Specialize2 {
+                    type Return;
+                    fn specialized(&self) -> Self::Return;
+                }
+                impl<'a, T: From<&'a str>> Specialize2 for &&Wrap<(&'a OsStr, PhantomData<T>)> {
+                    type Return = Result<T, Result<Infallible, OsString>>;
+                    fn specialized(&self) -> Self::Return {
+                        match self.0.0.to_str() {
+                            None => Err(Err(self.0.0.to_os_string())),
+                            Some(s) => Ok(T::from(s)),
+                        }
+                    }
+                }
+                trait Specialize1 {
+                    type Return;
+                    fn specialized(&self) -> Self::Return;
+                }
+                impl<'a, T> Specialize1 for &Wrap<(&'a OsStr, PhantomData<T>)> {
+                    type Return = Result<T, Result<String, OsString>>;
+                    fn specialized(&self) -> Self::Return {
+                        Err(Ok(format!(
+                            "Type `{}` does not implement any of the parsing traits: \
+                            `clap::ArgEnum`, `clap::TryFromOsArg`, `TryFrom<&OsStr>`, `FromStr`, \
+                            `TryFrom<&str>`, `From<&OsStr>`, or `From<&str>`",
+                            stringify!(#result_type)
+                        )))
+                    }
+                }
+                (&&&&&&&&Wrap((os_str.as_os_str(), PhantomData::<#result_type>))).specialized()
+            } {
+                Ok(value) => value,
+                Err(e) => {
+                    // TODO: Prettier errors.
+                    eprintln!("environment variable parsing error: {:?}", e);
+                    std::process::exit(3);
+                }
+            }
+            None => #default,
+        }
     }
 }
 
