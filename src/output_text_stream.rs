@@ -9,8 +9,6 @@ use basic_text::{TextStr, TextWriter, WriteText};
 use clap::TryFromOsArg;
 use io_streams::StreamWriter;
 use layered_io::{Bufferable, LayeredWriter, WriteLayered};
-#[cfg(all(not(unix), not(windows)))]
-use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
     ffi::{OsStr, OsString},
     fmt::{self, Arguments, Debug, Formatter},
@@ -19,7 +17,7 @@ use std::{
 };
 use terminal_io::{Terminal, TerminalColorSupport, TerminalWriter, WriteTerminal};
 #[cfg(not(windows))]
-use unsafe_io::AsUnsafeHandle;
+use unsafe_io::os::rsix::AsRawFd;
 use utf8_io::{Utf8Writer, WriteStr};
 
 /// An output stream for plain text output.
@@ -80,7 +78,7 @@ impl OutputTextStream {
 
     fn from_output(output: Output) -> Self {
         #[cfg(unix)]
-        let is_stdout = output.writer.eq_handle(&std::io::stdout());
+        let is_stdout = output.writer.as_raw_fd() == std::io::stdout().as_raw_fd();
         let terminal = TerminalWriter::with_handle(output.writer);
         #[cfg(unix)]
         let is_terminal = terminal.is_output_terminal();
@@ -241,6 +239,9 @@ impl Drop for OutputTextStream {
             // Close standard output, prompting the child process to exit.
             if let Err(e) = self.writer.close() {
                 eprintln!("Output formatting process encountered error: {:?}", e);
+                #[cfg(not(windows))]
+                exit(rsix::process::EXIT_FAILURE);
+                #[cfg(windows)]
                 exit(libc::EXIT_FAILURE);
             }
 
@@ -251,12 +252,18 @@ impl Drop for OutputTextStream {
                             "Output formatting process exited with non-success exit status: {:?}",
                             status
                         );
+                        #[cfg(not(windows))]
+                        exit(rsix::process::EXIT_FAILURE);
+                        #[cfg(windows)]
                         exit(libc::EXIT_FAILURE);
                     }
                 }
 
                 Err(e) => {
                     eprintln!("Unable to wait for output formatting process: {:?}", e);
+                    #[cfg(not(windows))]
+                    exit(rsix::process::EXIT_FAILURE);
+                    #[cfg(windows)]
                     exit(libc::EXIT_FAILURE);
                 }
             }

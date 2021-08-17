@@ -4,12 +4,12 @@
 
 use crate::MediaType;
 use std::process::{Child, Command, Stdio};
-use unsafe_io::AsUnsafeHandle;
+use unsafe_io::AsRawGrip;
 
 /// Arrange for stdout to be connected to a pipe to a process which runs
 /// bat to do syntax highlighting and paging.
-pub(crate) fn summon_bat(stdout: &impl AsUnsafeHandle, media_type: &MediaType) -> Option<Child> {
-    assert!(stdout.eq_handle(&std::io::stdout()));
+pub(crate) fn summon_bat(stdout: &impl AsRawGrip, media_type: &MediaType) -> Option<Child> {
+    assert_eq!(stdout.as_raw_grip(), std::io::stdout().as_raw_grip());
 
     // If the "bat" command is available, use it.
     Command::new("bat")
