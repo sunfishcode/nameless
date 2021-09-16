@@ -1,8 +1,12 @@
-use crate::{path_to_name::path_to_name, MediaType};
+use crate::path_to_name::path_to_name;
+use crate::MediaType;
 use anyhow::anyhow;
-use flate2::{write::GzEncoder, Compression};
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use io_streams::StreamWriter;
-use std::{ffi::OsStr, fs::File, path::Path};
+use std::ffi::OsStr;
+use std::fs::File;
+use std::path::Path;
 use url::Url;
 
 pub(crate) struct Output {

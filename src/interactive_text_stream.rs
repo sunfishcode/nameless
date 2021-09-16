@@ -1,17 +1,13 @@
-use crate::{
-    open_interactive::{open_interactive, Interactive},
-    Pseudonym,
-};
+use crate::open_interactive::{open_interactive, Interactive};
+use crate::Pseudonym;
 use basic_text::TextDuplexer;
 use clap::TryFromOsArg;
 use duplex::Duplex;
 use io_streams::StreamDuplexer;
 use layered_io::{Bufferable, LayeredDuplexer, ReadLayered, Status, WriteLayered};
-use std::{
-    ffi::OsStr,
-    fmt::{self, Arguments, Debug, Formatter},
-    io::{self, IoSlice, IoSliceMut, Read, Write},
-};
+use std::ffi::OsStr;
+use std::fmt::{self, Arguments, Debug, Formatter};
+use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use terminal_io::{
     DuplexTerminal, ReadTerminal, Terminal, TerminalColorSupport, TerminalDuplexer, WriteTerminal,
 };
@@ -24,13 +20,13 @@ use utf8_io::{ReadStr, ReadStrLayered, Utf8Duplexer, WriteStr};
 /// a type in a `kommand` argument or `clap_derive` struct. Command-line
 /// arguments will then be automatically converted into input streams.
 /// Currently supported syntaxes include:
-///  - Names starting with `connect:` or `accept:`, which are
-///    interpreted as socket addresses to connect to or accept from.
-///    Socket addresses may contain host:port pairs or, on platforms which
-///    support it, filesystem paths to Unix-domain sockets.
+///  - Names starting with `connect:` or `accept:`, which are interpreted as
+///    socket addresses to connect to or accept from. Socket addresses may
+///    contain host:port pairs or, on platforms which support it, filesystem
+///    paths to Unix-domain sockets.
 ///  - "-" is interpreted as the pair (stdin, stdout).
-///  - "(...)" runs a command with pipes to and from the child process'
-///    (stdin, stdout), on platforms whch support it.
+///  - "(...)" runs a command with pipes to and from the child process' (stdin,
+///    stdout), on platforms whch support it.
 pub struct InteractiveTextStream {
     name: String,
     duplexer: TextDuplexer<Utf8Duplexer<LayeredDuplexer<TerminalDuplexer<StreamDuplexer>>>>,

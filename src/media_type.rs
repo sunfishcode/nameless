@@ -1,5 +1,6 @@
 use mime::Mime;
-use std::{ffi::OsStr, str::FromStr};
+use std::ffi::OsStr;
+use std::str::FromStr;
 
 /// The type of content in a stream. This can be either a Media Type
 /// (aka Mime Type) or a filename extension, both, or neither if nothing

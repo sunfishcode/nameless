@@ -1,5 +1,6 @@
 use anyhow::anyhow;
-use std::{path::Path, str};
+use std::path::Path;
+use std::str;
 #[cfg(not(windows))]
 use {
     percent_encoding::{percent_encode, NON_ALPHANUMERIC},
@@ -80,7 +81,8 @@ fn test_path_to_name() {
     // TODO: Redo how relative paths are handled.
     // assert_eq!(path_to_name("file", Path::new("./foo")).unwrap(), "./foo");
     // assert_eq!(
-    //    path_to_name("file", OsStr::from_bytes(b"f\xffoo").as_ref()).unwrap(),
-    //    "\"./f\\u{fffd}oo\""
+    //    path_to_name("file",
+    // OsStr::from_bytes(b"f\xffoo").as_ref()).unwrap(),    "\"./f\\
+    // u{fffd}oo\""
     //);
 }

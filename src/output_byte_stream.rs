@@ -1,17 +1,13 @@
-use crate::{
-    lazy_output::FromLazyOutput,
-    open_output::{open_output, Output},
-    MediaType, Pseudonym,
-};
+use crate::lazy_output::FromLazyOutput;
+use crate::open_output::{open_output, Output};
+use crate::{MediaType, Pseudonym};
 use anyhow::anyhow;
 use clap::TryFromOsArg;
 use io_streams::StreamWriter;
 use layered_io::{Bufferable, LayeredWriter, WriteLayered};
-use std::{
-    ffi::{OsStr, OsString},
-    fmt::{self, Arguments, Debug, Formatter},
-    io::{self, IoSlice, Write},
-};
+use std::ffi::{OsStr, OsString};
+use std::fmt::{self, Arguments, Debug, Formatter};
+use std::io::{self, IoSlice, Write};
 use terminal_io::{NeverTerminalWriter, TerminalWriter, WriteTerminal};
 
 /// An output stream for binary output.
@@ -28,14 +24,14 @@ use terminal_io::{NeverTerminalWriter, TerminalWriter, WriteTerminal};
 /// a type in a `kommand` argument or `clap_derive` struct. Command-line
 /// arguments will then be automatically converted into output streams.
 /// Currently supported syntaxes include:
-///  - Names starting with `file:` are interpreted as local filesystem
-///    URLs providing paths to files to open.
+///  - Names starting with `file:` are interpreted as local filesystem URLs
+///    providing paths to files to open.
 ///  - "-" is interpreted as standard output.
-///  - "(...)" runs a command with a pipe to the child process' stdin,
-///    on platforms whch support it.
+///  - "(...)" runs a command with a pipe to the child process' stdin, on
+///    platforms whch support it.
 ///  - Names which don't parse as URLs are interpreted as plain local
-///    filesystem paths. To force a string to be interpreted as a plain
-///    local path, arrange for it to begin with `./` or `/`.
+///    filesystem paths. To force a string to be interpreted as a plain local
+///    path, arrange for it to begin with `./` or `/`.
 ///
 /// Programs using `OutputByteStream` as an argument should avoid using
 /// `std::io::stdout`, `std::println`, or anything else which uses standard

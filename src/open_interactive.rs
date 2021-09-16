@@ -2,13 +2,11 @@ use crate::path_to_name::path_to_name;
 use anyhow::anyhow;
 use char_device::CharDevice;
 use io_streams::StreamDuplexer;
+use std::ffi::OsStr;
+use std::net::{TcpListener, TcpStream};
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::{
-    ffi::OsStr,
-    net::{TcpListener, TcpStream},
-    path::Path,
-};
+use std::path::Path;
 use url::Url;
 
 pub(crate) struct Interactive {

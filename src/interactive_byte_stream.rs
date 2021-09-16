@@ -1,7 +1,5 @@
-use crate::{
-    open_interactive::{open_interactive, Interactive},
-    Pseudonym,
-};
+use crate::open_interactive::{open_interactive, Interactive};
+use crate::Pseudonym;
 use clap::TryFromOsArg;
 use duplex::Duplex;
 use io_streams::StreamDuplexer;
@@ -9,11 +7,9 @@ use layered_io::{
     default_read, default_read_to_end, default_read_to_string, default_read_vectored, Bufferable,
     LayeredDuplexer, ReadLayered, Status, WriteLayered,
 };
-use std::{
-    ffi::OsStr,
-    fmt::{self, Arguments, Debug, Formatter},
-    io::{self, IoSlice, IoSliceMut, Read, Write},
-};
+use std::ffi::OsStr;
+use std::fmt::{self, Arguments, Debug, Formatter};
+use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use terminal_io::{
     DuplexTerminal, NeverTerminalDuplexer, ReadTerminal, Terminal, TerminalColorSupport,
     WriteTerminal,
@@ -26,13 +22,13 @@ use terminal_io::{
 /// a type in a `kommand` argument or `clap_derive` struct. Command-line
 /// arguments will then be automatically converted into input streams.
 /// Currently supported syntaxes include:
-///  - Names starting with `connect:` or `accept:`, which are
-///    interpreted as socket addresses to connect to or accept from.
-///    Socket addresses may contain host:port pairs or, on platforms which
-///    support it, filesystem paths to Unix-domain sockets.
+///  - Names starting with `connect:` or `accept:`, which are interpreted as
+///    socket addresses to connect to or accept from. Socket addresses may
+///    contain host:port pairs or, on platforms which support it, filesystem
+///    paths to Unix-domain sockets.
 ///  - "-" is interpreted as the pair (stdin, stdout).
-///  - "(...)" runs a command with pipes to and from the child process'
-///    (stdin, stdout), on platforms whch support it.
+///  - "(...)" runs a command with pipes to and from the child process' (stdin,
+///    stdout), on platforms whch support it.
 pub struct InteractiveByteStream {
     name: String,
     duplexer: LayeredDuplexer<NeverTerminalDuplexer<StreamDuplexer>>,

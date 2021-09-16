@@ -1,11 +1,9 @@
 use crate::MediaType;
 use clap::TryFromOsArg;
-use std::{
-    error::Error,
-    ffi::{OsStr, OsString},
-    fmt,
-    marker::PhantomData,
-};
+use std::error::Error;
+use std::ffi::{OsStr, OsString};
+use std::fmt;
+use std::marker::PhantomData;
 
 #[doc(hidden)]
 #[derive(Debug)]

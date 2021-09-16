@@ -1,9 +1,14 @@
-use crate::{path_to_name::path_to_name, MediaType, Mime};
+use crate::path_to_name::path_to_name;
+use crate::{MediaType, Mime};
 use anyhow::anyhow;
 use data_url::DataUrl;
 use flate2::read::GzDecoder;
 use io_streams::StreamReader;
-use std::{convert::TryInto, ffi::OsStr, fs::File, path::Path, str::FromStr};
+use std::convert::TryInto;
+use std::ffi::OsStr;
+use std::fs::File;
+use std::path::Path;
+use std::str::FromStr;
 use url::Url;
 #[cfg(feature = "ssh2")]
 use {percent_encoding::percent_decode, ssh2::Session, std::net::TcpStream};

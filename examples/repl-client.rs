@@ -3,10 +3,8 @@
 
 use io_streams::BufReaderLineWriter;
 use nameless::InteractiveTextStream;
-use std::{
-    io::{BufRead, Read, Write},
-    str,
-};
+use std::io::{BufRead, Read, Write};
+use std::str;
 
 const PROMPT: &str = "prompt> \u{34f}";
 

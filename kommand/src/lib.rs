@@ -9,12 +9,9 @@ use std::cmp::max;
 use std::collections::HashSet;
 use std::env::var_os;
 use std::ops::{Bound, Range, RangeBounds};
-use syn::{
-    parse_macro_input, parse_quote,
-    spanned::Spanned,
-    visit_mut::{self, VisitMut},
-    Expr, Ident, LitStr, Pat, Stmt, Type,
-};
+use syn::spanned::Spanned;
+use syn::visit_mut::{self, VisitMut};
+use syn::{parse_macro_input, parse_quote, Expr, Ident, LitStr, Pat, Stmt, Type};
 
 #[proc_macro_attribute]
 pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {

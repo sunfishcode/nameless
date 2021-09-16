@@ -1,15 +1,11 @@
-use crate::{
-    open_input::{open_input, Input},
-    MediaType, Pseudonym,
-};
+use crate::open_input::{open_input, Input};
+use crate::{MediaType, Pseudonym};
 use clap::TryFromOsArg;
 use io_streams::StreamReader;
 use layered_io::{Bufferable, LayeredReader, ReadLayered, Status};
-use std::{
-    ffi::OsStr,
-    fmt::{self, Debug, Formatter},
-    io::{self, IoSliceMut, Read},
-};
+use std::ffi::OsStr;
+use std::fmt::{self, Debug, Formatter};
+use std::io::{self, IoSliceMut, Read};
 use terminal_io::NeverTerminalReader;
 
 /// An input stream for binary input.
@@ -26,18 +22,18 @@ use terminal_io::NeverTerminalReader;
 /// a type in a `kommand` argument or `clap_derive` struct. Command-line
 /// arguments will then be automatically converted into input streams.
 /// Currently supported syntaxes include:
-///  - Names starting with `https:` or `http:`, which are interpreted
-///    as URLs to open.
-///  - Names starting with `data:` are interpreted as data URLs proving
-///    the data in their payload.
-///  - Names starting with `file:` are interpreted as local filesystem
-///    URLs providing paths to files to open.
+///  - Names starting with `https:` or `http:`, which are interpreted as URLs
+///    to open.
+///  - Names starting with `data:` are interpreted as data URLs proving the
+///    data in their payload.
+///  - Names starting with `file:` are interpreted as local filesystem URLs
+///    providing paths to files to open.
 ///  - "-" is interpreted as standard input.
-///  - "(...)" runs a command with a pipe from the child process' stdout,
-///    on platforms whch support it.
+///  - "(...)" runs a command with a pipe from the child process' stdout, on
+///    platforms whch support it.
 ///  - Names which don't parse as URLs are interpreted as plain local
-///    filesystem paths. To force a string to be interpreted as a plain
-///    local path, arrange for it to begin with `./` or `/`.
+///    filesystem paths. To force a string to be interpreted as a plain local
+///    path, arrange for it to begin with `./` or `/`.
 pub struct InputByteStream {
     name: String,
     reader: LayeredReader<NeverTerminalReader<StreamReader>>,
