@@ -5,6 +5,8 @@ use crate::summon_bat::summon_bat;
 use crate::{MediaType, Pseudonym};
 use basic_text::{TextStr, TextWriter, WriteText};
 use clap::TryFromOsArg;
+#[cfg(not(windows))]
+use io_extras::os::rustix::AsRawFd;
 use io_streams::StreamWriter;
 use layered_io::{Bufferable, LayeredWriter, WriteLayered};
 use std::ffi::{OsStr, OsString};
@@ -12,8 +14,6 @@ use std::fmt::{self, Arguments, Debug, Formatter};
 use std::io::{self, IoSlice, Write};
 use std::process::{exit, Child};
 use terminal_io::{Terminal, TerminalColorSupport, TerminalWriter, WriteTerminal};
-#[cfg(not(windows))]
-use unsafe_io::os::rsix::AsRawFd;
 use utf8_io::{Utf8Writer, WriteStr};
 
 /// An output stream for plain text output.
@@ -236,7 +236,7 @@ impl Drop for OutputTextStream {
             if let Err(e) = self.writer.close() {
                 eprintln!("Output formatting process encountered error: {:?}", e);
                 #[cfg(not(windows))]
-                exit(rsix::process::EXIT_FAILURE);
+                exit(rustix::process::EXIT_FAILURE);
                 #[cfg(windows)]
                 exit(libc::EXIT_FAILURE);
             }
@@ -249,7 +249,7 @@ impl Drop for OutputTextStream {
                             status
                         );
                         #[cfg(not(windows))]
-                        exit(rsix::process::EXIT_FAILURE);
+                        exit(rustix::process::EXIT_FAILURE);
                         #[cfg(windows)]
                         exit(libc::EXIT_FAILURE);
                     }
@@ -258,7 +258,7 @@ impl Drop for OutputTextStream {
                 Err(e) => {
                     eprintln!("Unable to wait for output formatting process: {:?}", e);
                     #[cfg(not(windows))]
-                    exit(rsix::process::EXIT_FAILURE);
+                    exit(rustix::process::EXIT_FAILURE);
                     #[cfg(windows)]
                     exit(libc::EXIT_FAILURE);
                 }

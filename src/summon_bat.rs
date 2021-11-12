@@ -3,8 +3,8 @@
 //! [`bat`]: https://crates.io/crates/bat
 
 use crate::MediaType;
+use io_extras::grip::AsRawGrip;
 use std::process::{Child, Command, Stdio};
-use unsafe_io::AsRawGrip;
 
 /// Arrange for stdout to be connected to a pipe to a process which runs
 /// bat to do syntax highlighting and paging.
