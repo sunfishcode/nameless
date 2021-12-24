@@ -10,9 +10,6 @@ categories = ["command-line-interface", "filesystem", "network-programming"]
 repository = "https://github.com/sunfishcode/nameless"
 exclude = ["/.github"]
 
-[build-dependencies]
-rustc_version = "0.4.0"
-
 [dependencies]
 anyhow = "1.0.35"
 char-device = "0.10.0"
