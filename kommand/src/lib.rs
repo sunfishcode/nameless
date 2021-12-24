@@ -1,9 +1,9 @@
 #![forbid(unsafe_code)]
 
-use heck::ShoutySnakeCase;
+use heck::ToShoutySnakeCase;
 use proc_macro::TokenStream;
 use proc_macro2::{Ident as Ident2, Span as Span2, TokenStream as TokenStream2};
-use pulldown_cmark::{Event, OffsetIter, Options, Parser, Tag};
+use pulldown_cmark::{Event, HeadingLevel, OffsetIter, Options, Parser, Tag};
 use quote::{format_ident, quote, quote_spanned};
 use std::cmp::max;
 use std::collections::HashSet;
@@ -515,10 +515,13 @@ fn parse_arguments_from_comment(
 ) -> Result<(String, Vec<(String, String)>), TokenStream> {
     let mut p = Parser::new_ext(&about, opts()).into_offset_iter();
     while let Some((event, start_offset)) = p.next() {
-        if matches!(event, Event::Start(Tag::Heading(1))) {
+        if matches!(event, Event::Start(Tag::Heading(HeadingLevel::H1, _, _))) {
             if let Some((Event::Text(content), _)) = p.next() {
                 if &*content != "Arguments"
-                    || !matches!(p.next(), Some((Event::End(Tag::Heading(1)), _)))
+                    || !matches!(
+                        p.next(),
+                        Some((Event::End(Tag::Heading(HeadingLevel::H1, _, _)), _))
+                    )
                 {
                     continue;
                 }
@@ -610,10 +613,13 @@ fn parse_env_vars_from_comment(
 ) -> Result<(String, Vec<(String, String)>), TokenStream> {
     let mut p = Parser::new_ext(&about, opts()).into_offset_iter();
     while let Some((event, start_offset)) = p.next() {
-        if matches!(event, Event::Start(Tag::Heading(1))) {
+        if matches!(event, Event::Start(Tag::Heading(HeadingLevel::H1, _, _))) {
             if let Some((Event::Text(content), _)) = p.next() {
                 if &*content != "Environment Variables"
-                    || !matches!(p.next(), Some((Event::End(Tag::Heading(1)), _)))
+                    || !matches!(
+                        p.next(),
+                        Some((Event::End(Tag::Heading(HeadingLevel::H1, _, _)), _))
+                    )
                 {
                     continue;
                 }
