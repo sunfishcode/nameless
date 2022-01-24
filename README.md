@@ -13,6 +13,9 @@
   </p>
 </div>
 
+*This is currently an experimental project, and the API and command-line
+argument syntax are not currently stable.*
+
 Nameless provides full-service command-line parsing. This means you just write
 a `main` function with arguments with the types you want, add a [conventional]
 documentation comment, and it takes care of the rest:
