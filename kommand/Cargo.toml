@@ -23,6 +23,3 @@ pulldown-cmark = "0.9.0"
 clap = { version = "3.0.0-beta.2", package = "nameless-clap" }
 clap_derive = { version = "3.0.0-beta.2", package = "nameless-clap_derive" }
 nameless = { path = ".." }
-
-[badges]
-maintenance = { status = "actively-developed" }

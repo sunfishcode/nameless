@@ -20,6 +20,3 @@ quote = "1.0.2"
 [dev-dependencies]
 clap = "3.0.0-beta.2"
 clap_derive = "3.0.0-beta.2"
-
-[badges]
-maintenance = { status = "actively-developed" }
