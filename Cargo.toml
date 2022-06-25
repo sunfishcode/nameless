@@ -34,7 +34,7 @@ utf8-io = { version = "0.13.0", features = ["layered-io", "terminal-io"] }
 whoami = "1.1.0"
 
 [target.'cfg(not(windows))'.dependencies]
-rustix = { version = "0.35.6-beta.2", features = ["process"] }
+rustix = { version = "0.35.6", features = ["process"] }
 shell-words = "1.0.0"
 
 [target.'cfg(windows)'.dependencies]
