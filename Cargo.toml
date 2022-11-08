@@ -12,29 +12,29 @@ exclude = ["/.github"]
 
 [dependencies]
 anyhow = "1.0.35"
-char-device = "0.13.0"
+char-device = "0.14.0"
 clap = { version = "3.0.0-beta.2", package = "nameless-clap" }
-data-url = "0.1.0"
-duplex = "0.13.0"
+data-url = "0.2.0"
+duplex = "0.14.0"
 flate2 = "1.0.19"
-layered-io = { version = "0.14.0", features = ["terminal-io"] }
-io-streams = { version = "0.12.0", features = ["layered-io", "terminal-io", "use_char_device", "use_socketpair"] }
-io-arrays = "0.10.0"
+layered-io = { version = "0.17.0", features = ["terminal-io"] }
+io-streams = { version = "0.13.0", features = ["layered-io", "terminal-io", "use_char_device", "use_socketpair"] }
+io-arrays = "0.11.0"
 mime = "0.3.16"
 mime_guess = "2.0.3"
 percent-encoding = "2.1.0"
-basic-text = { version = "0.12.0", features = ["terminal-io"] }
-io-extras = "0.15.0"
+basic-text = { version = "0.14.0", features = ["terminal-io"] }
+io-extras = "0.16.0"
 ureq = { version = "2.0.0", default-features = false, features = ["tls", "charset"] }
 url = "2.2.0"
-terminal-io = "0.14.0"
+terminal-io = "0.15.0"
 ssh2 = { version = "0.9.0", optional = true }
-system-interface = { version = "0.21.0", features = ["ssh2"] }
-utf8-io = { version = "0.13.0", features = ["layered-io", "terminal-io"] }
+system-interface = { version = "0.24.0", features = ["ssh2"] }
+utf8-io = { version = "0.14.0", features = ["layered-io", "terminal-io"] }
 whoami = "1.1.0"
 
 [target.'cfg(not(windows))'.dependencies]
-rustix = { version = "0.35.6", features = ["process"] }
+rustix = { version = "0.36.0", features = ["process"] }
 shell-words = "1.0.0"
 
 [target.'cfg(windows)'.dependencies]
