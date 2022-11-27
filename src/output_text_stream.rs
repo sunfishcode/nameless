@@ -4,7 +4,7 @@ use crate::open_output::{open_output, Output};
 use crate::summon_bat::summon_bat;
 use crate::{MediaType, Pseudonym};
 use basic_text::{TextStr, TextWriter, WriteText};
-use clap::TryFromOsArg;
+use clap::{AmbientAuthority, TryFromOsArg};
 #[cfg(not(windows))]
 use io_extras::os::rustix::AsRawFd;
 use io_streams::StreamWriter;
@@ -127,8 +127,11 @@ impl TryFromOsArg for OutputTextStream {
     type Error = anyhow::Error;
 
     #[inline]
-    fn try_from_os_str_arg(os: &OsStr) -> anyhow::Result<Self> {
-        open_output(os, MediaType::text()).map(Self::from_output)
+    fn try_from_os_str_arg(
+        os: &OsStr,
+        ambient_authority: AmbientAuthority,
+    ) -> anyhow::Result<Self> {
+        open_output(os, MediaType::text(), ambient_authority).map(Self::from_output)
     }
 }
 
@@ -270,8 +273,12 @@ impl Drop for OutputTextStream {
 impl FromLazyOutput for OutputTextStream {
     type Err = anyhow::Error;
 
-    fn from_lazy_output(name: OsString, media_type: MediaType) -> Result<Self, anyhow::Error> {
-        open_output(&name, media_type).map(Self::from_output)
+    fn from_lazy_output(
+        name: OsString,
+        media_type: MediaType,
+        ambient_authority: AmbientAuthority,
+    ) -> Result<Self, anyhow::Error> {
+        open_output(&name, media_type, ambient_authority).map(Self::from_output)
     }
 }
 

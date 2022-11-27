@@ -1,6 +1,6 @@
 use crate::open_interactive::{open_interactive, Interactive};
 use crate::Pseudonym;
-use clap::TryFromOsArg;
+use clap::{AmbientAuthority, TryFromOsArg};
 use duplex::Duplex;
 use io_streams::StreamDuplexer;
 use layered_io::{
@@ -62,8 +62,11 @@ impl TryFromOsArg for InteractiveByteStream {
     type Error = anyhow::Error;
 
     #[inline]
-    fn try_from_os_str_arg(os: &OsStr) -> anyhow::Result<Self> {
-        open_interactive(os).map(Self::from_interactive)
+    fn try_from_os_str_arg(
+        os: &OsStr,
+        ambient_authority: AmbientAuthority,
+    ) -> anyhow::Result<Self> {
+        open_interactive(os, ambient_authority).map(Self::from_interactive)
     }
 }
 

@@ -2,7 +2,7 @@ use crate::lazy_output::FromLazyOutput;
 use crate::open_output::{open_output, Output};
 use crate::{MediaType, Pseudonym};
 use anyhow::anyhow;
-use clap::TryFromOsArg;
+use clap::{AmbientAuthority, TryFromOsArg};
 use io_streams::StreamWriter;
 use layered_io::{Bufferable, LayeredWriter, WriteLayered};
 use std::ffi::{OsStr, OsString};
@@ -93,8 +93,11 @@ impl TryFromOsArg for OutputByteStream {
     type Error = anyhow::Error;
 
     #[inline]
-    fn try_from_os_str_arg(os: &OsStr) -> anyhow::Result<Self> {
-        open_output(os, MediaType::unknown()).and_then(Self::from_output)
+    fn try_from_os_str_arg(
+        os: &OsStr,
+        ambient_authority: AmbientAuthority,
+    ) -> anyhow::Result<Self> {
+        open_output(os, MediaType::unknown(), ambient_authority).and_then(Self::from_output)
     }
 }
 
@@ -154,8 +157,12 @@ impl Bufferable for OutputByteStream {
 impl FromLazyOutput for OutputByteStream {
     type Err = anyhow::Error;
 
-    fn from_lazy_output(name: OsString, media_type: MediaType) -> Result<Self, anyhow::Error> {
-        open_output(&name, media_type).and_then(Self::from_output)
+    fn from_lazy_output(
+        name: OsString,
+        media_type: MediaType,
+        ambient_authority: AmbientAuthority,
+    ) -> Result<Self, anyhow::Error> {
+        open_output(&name, media_type, ambient_authority).and_then(Self::from_output)
     }
 }
 

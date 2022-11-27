@@ -390,6 +390,7 @@ fn generate_env_initializer(default: Box<Expr>, pat_ident: Ident2, result_type: 
                     fn specialized(&self) -> Self::Return {
                         T::try_from_os_str_arg(
                             self.0.0,
+                            clap::ambient_authority()
                         ).map_err(Ok)
                     }
                 }

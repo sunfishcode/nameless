@@ -1,6 +1,7 @@
 use crate::path_to_name::path_to_name;
 use crate::{MediaType, Mime};
 use anyhow::anyhow;
+use clap::AmbientAuthority;
 use data_url::DataUrl;
 use flate2::read::GzDecoder;
 use io_streams::StreamReader;
@@ -20,7 +21,10 @@ pub(crate) struct Input {
     pub(crate) initial_size: Option<u64>,
 }
 
-pub(crate) fn open_input(os: &OsStr) -> anyhow::Result<Input> {
+pub(crate) fn open_input(
+    os: &OsStr,
+    _ambient_authority: AmbientAuthority,
+) -> anyhow::Result<Input> {
     if let Some(s) = os.to_str() {
         // If we can parse it as a URL, treat it as such.
         if let Ok(url) = Url::parse(s) {

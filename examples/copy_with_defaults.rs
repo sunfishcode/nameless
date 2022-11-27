@@ -1,7 +1,7 @@
 //! A simple program using `kommand` that copies from an
 //! `InputByteStream` into an `OutputByteStream`.
 
-use clap::TryFromOsArg;
+use clap::{ambient_authority, TryFromOsArg};
 use nameless::{InputByteStream, OutputByteStream};
 use std::io::copy;
 
@@ -14,12 +14,12 @@ fn main(input: Option<InputByteStream>, output: Option<OutputByteStream>) -> any
     let mut input = if let Some(input) = input {
         input
     } else {
-        InputByteStream::try_from_os_str_arg("-".as_ref())?
+        InputByteStream::try_from_os_str_arg("-".as_ref(), ambient_authority())?
     };
     let mut output = if let Some(output) = output {
         output
     } else {
-        OutputByteStream::try_from_os_str_arg("-".as_ref())?
+        OutputByteStream::try_from_os_str_arg("-".as_ref(), ambient_authority())?
     };
 
     copy(&mut input, &mut output)?;

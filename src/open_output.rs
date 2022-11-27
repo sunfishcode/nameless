@@ -1,6 +1,7 @@
 use crate::path_to_name::path_to_name;
 use crate::MediaType;
 use anyhow::anyhow;
+use clap::AmbientAuthority;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use io_streams::StreamWriter;
@@ -15,7 +16,11 @@ pub(crate) struct Output {
     pub(crate) media_type: MediaType,
 }
 
-pub(crate) fn open_output(os: &OsStr, media_type: MediaType) -> anyhow::Result<Output> {
+pub(crate) fn open_output(
+    os: &OsStr,
+    media_type: MediaType,
+    _ambient_authority: AmbientAuthority,
+) -> anyhow::Result<Output> {
     if let Some(s) = os.to_str() {
         // If we can parse it as a URL, treat it as such.
         if let Ok(url) = Url::parse(s) {

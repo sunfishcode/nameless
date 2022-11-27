@@ -1,6 +1,7 @@
 use crate::path_to_name::path_to_name;
 use anyhow::anyhow;
 use char_device::CharDevice;
+use clap::AmbientAuthority;
 use io_streams::StreamDuplexer;
 use std::ffi::OsStr;
 use std::net::{TcpListener, TcpStream};
@@ -14,7 +15,10 @@ pub(crate) struct Interactive {
     pub(crate) duplexer: StreamDuplexer,
 }
 
-pub(crate) fn open_interactive(os: &OsStr) -> anyhow::Result<Interactive> {
+pub(crate) fn open_interactive(
+    os: &OsStr,
+    _ambient_authority: AmbientAuthority,
+) -> anyhow::Result<Interactive> {
     if let Some(s) = os.to_str() {
         // If we can parse it as a URL, treat it as such.
         if let Ok(url) = Url::parse(s) {

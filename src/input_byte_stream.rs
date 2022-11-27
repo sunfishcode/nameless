@@ -1,6 +1,6 @@
 use crate::open_input::{open_input, Input};
 use crate::{MediaType, Pseudonym};
-use clap::TryFromOsArg;
+use clap::{AmbientAuthority, TryFromOsArg};
 use io_streams::StreamReader;
 use layered_io::{Bufferable, LayeredReader, ReadLayered, Status};
 use std::ffi::OsStr;
@@ -91,8 +91,11 @@ impl TryFromOsArg for InputByteStream {
     type Error = anyhow::Error;
 
     #[inline]
-    fn try_from_os_str_arg(os: &OsStr) -> anyhow::Result<Self> {
-        open_input(os).map(Self::from_input)
+    fn try_from_os_str_arg(
+        os: &OsStr,
+        ambient_authority: AmbientAuthority,
+    ) -> anyhow::Result<Self> {
+        open_input(os, ambient_authority).map(Self::from_input)
     }
 }
 
@@ -164,19 +167,25 @@ impl Debug for InputByteStream {
 #[test]
 fn data_url_plain() {
     let mut s = String::new();
-    InputByteStream::try_from_os_str_arg("data:,Hello%2C%20World!".as_ref())
-        .unwrap()
-        .read_to_string(&mut s)
-        .unwrap();
+    InputByteStream::try_from_os_str_arg(
+        "data:,Hello%2C%20World!".as_ref(),
+        clap::ambient_authority(),
+    )
+    .unwrap()
+    .read_to_string(&mut s)
+    .unwrap();
     assert_eq!(s, "Hello, World!");
 }
 
 #[test]
 fn data_url_base64() {
     let mut s = String::new();
-    InputByteStream::try_from_os_str_arg("data:text/plain;base64,SGVsbG8sIFdvcmxkIQ==".as_ref())
-        .unwrap()
-        .read_to_string(&mut s)
-        .unwrap();
+    InputByteStream::try_from_os_str_arg(
+        "data:text/plain;base64,SGVsbG8sIFdvcmxkIQ==".as_ref(),
+        clap::ambient_authority(),
+    )
+    .unwrap()
+    .read_to_string(&mut s)
+    .unwrap();
     assert_eq!(s, "Hello, World!");
 }
