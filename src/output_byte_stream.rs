@@ -49,9 +49,9 @@ impl OutputByteStream {
         Write::write_all(self, pseudonym.name.as_bytes())
     }
 
-    /// Write the name of the given output stream to the output stream. This is
-    /// needed because the name of an `OutputByteStream` is not available in
-    /// the public API.
+    /// Return a `Pseudonym` which encapsulates this stream's name (typically
+    /// its filesystem path or its URL). This allows it to be written to an
+    /// `OutputByteStream` while otherwise remaining entirely opaque.
     #[inline]
     pub fn pseudonym(&self) -> Pseudonym {
         Pseudonym::new(self.name.clone())
