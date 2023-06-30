@@ -5,7 +5,6 @@ use clap::AmbientAuthority;
 use data_url::DataUrl;
 use flate2::read::GzDecoder;
 use io_streams::StreamReader;
-use std::convert::TryInto;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::path::Path;
