@@ -45,7 +45,7 @@ humantime = "2.0.1"
 kommand = { path = "kommand" }
 reaktor = { path = "reaktor" }
 regex = "1.4.2"
-itertools = "0.11.0"
+itertools = "0.12.0"
 clap_derive = { version = "3.0.0-beta.2.2", package = "nameless-clap_derive" }
 
 [workspace]
