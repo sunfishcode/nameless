@@ -1,6 +1,6 @@
 [package]
 name = "reaktor"
-version = "0.15.1"
+version = "0.15.2"
 description = "Reaktor"
 authors = ["Dan Gohman <dev@sunfishcode.online>"]
 edition = "2021"
